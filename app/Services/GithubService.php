@@ -5,16 +5,14 @@ use GuzzleHttp\Client;
 class GitHubService
 {
     private $client;
-    private $config;
 
     public function __construct()
     {
-        $this->config = require __DIR__ . '/../config/config.php';
         $this->client = new Client([
-            'base_uri' => 'https://api.github.com',
+            'base_uri' => $_ENV['GITHUB_API_URL'],
             'headers' => [
                 'Accept' => 'application/vnd.github+json',
-                'Authorization' => 'Bearer ' . $this->config['github']['token'],
+                'Authorization' => 'Bearer ' . $_ENV['GITHUB_TOKEN'],
                 'X-GitHub-Api-Version' => '2022-11-28'
             ]
         ]);
