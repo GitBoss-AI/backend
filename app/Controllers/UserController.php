@@ -43,7 +43,7 @@ class UserController {
             'message' => 'Login successful',
             'user_id' => $user['id'],
             'token' => $token,
-            'expires' => $payload['exp']
+            'expires' => $payload['expiration']
         ]);
     }
 
