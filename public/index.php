@@ -15,5 +15,12 @@ try {
     ]);
 }
 
+# Load environment variables
+$dotenvPath = __DIR__ . '/../.env';
+if (file_exists($dotenvPath)) {
+    $dotenv = \Dotenv\Dotenv::createImmutable(dirname($dotenvPath));
+    $dotenv->load();
+}
+
 # Apply CORS
 \App\Middleware\CORS::handle();

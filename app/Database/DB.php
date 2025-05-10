@@ -8,13 +8,6 @@ class DB {
     private $pdo;
 
     private function __construct() {
-    	// Load environment variables from .env file if it exists
-        $dotenvPath = __DIR__ . '/../../.env';
-        if (file_exists($dotenvPath)) {
-            $dotenv = \Dotenv\Dotenv::createImmutable(dirname($dotenvPath));
-            $dotenv->load();
-        }
-        
         $host = $_ENV['DB_HOST'];
         $dbname = $_ENV['DB_NAME'];
         $user = $_ENV['DB_USER'];
