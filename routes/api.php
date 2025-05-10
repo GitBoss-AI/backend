@@ -12,10 +12,18 @@ $routes = [
         '/api-dev/register' => [UserController::class, 'register'],
     ],
     'GET' => [
+        // Health
         '/api-dev/health'   => [HealthController::class, 'check'],
+
+        // Repo
+        '/api-dev/repo/add' => [RepoController::class, 'addRepo'],
         '/api-dev/repository-stats' => [RepositoryStatsController::class, 'getStats'],
+
+        // Team activity
         '/api-dev/team-activity/timeline' => [TeamActivityController::class, 'getTimeline'],
         '/api-dev/team-activity/comparison' => [TeamActivityController::class, 'getComparison'],
+
+        // Activity feed
         '/api-dev/recent-activity' => [RecentActivityController::class, 'getRecentActivity'],
     ],
 ];
