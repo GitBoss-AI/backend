@@ -1,6 +1,7 @@
 <?php
-use App\Controllers\UserController;
 use App\Controllers\HealthController;
+use App\Controllers\UserController;
+use App\Controllers\RepoController;
 use App\Controllers\RepositoryStatsController;
 use App\Controllers\TeamActivityController;
 use App\Controllers\RecentActivityController;
