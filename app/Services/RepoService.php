@@ -13,7 +13,7 @@ class RepoService {
         $this->githubService = new GithubService();
     }
 
-    public function addRepo(int $user_id, string $repo_url) {
+    public function add(int $user_id, string $repo_url) {
         $repo = $this->db->selectOne(
             "SELECT id FROM repos WHERE url = :url",
             ['url' => $repo_url]
@@ -52,5 +52,15 @@ class RepoService {
             'created_at' => date('Y-m-d H:i:s')
         ];
         $this->db->insert('repos', $repoData);
+    }
+
+    public function getAll(int $user_id) {
+        return $this->db->selectAll(
+            "SELECT r.*
+            FROM repos r
+            JOIN github_ownerships go ON r.owner = go.owner
+            WHERE go.user_id = :user_id",
+            ['user_id' => $user_id]
+        );
     }
 }

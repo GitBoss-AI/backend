@@ -18,6 +18,7 @@ $routes = [
 
         // Repo
         '/api-dev/repo/add' => [RepoController::class, 'addRepo'],
+        '/api-dev/repo/getAll' => [RepoController::class, 'getAll'],
         '/api-dev/repository-stats' => [RepositoryStatsController::class, 'getStats'],
 
         // Team activity
