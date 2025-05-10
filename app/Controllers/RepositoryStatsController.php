@@ -2,30 +2,17 @@
 namespace App\Controllers;
 use App\Services\GitHubService;
 
-class RepositoryStatsController
+class RepositoryStatsController extends BaseController
 {
     public function getStats()
     {
-        try {
-            $owner = $_GET['owner'] ?? $_ENV['GITHUB_OWNER'];
-            $repo = $_GET['repo'] ?? $_ENV['GITHUB_REPO'];
-
-            if (!$owner || !$repo) {
-                http_response_code(400);
-                header('Content-Type: application/json');
-                echo json_encode(['error' => 'Owner and repo parameters are required']);
-                return;
-            }
-
-            $githubService = new GitHubService();
-            $stats = $githubService->getRepositoryStats($owner, $repo);
+        $this->executeWithErrorHandling(function() {
+            list($owner, $repo) = $this->getOwnerAndRepo();
             
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'data' => $stats]);
-        } catch (\Exception $e) {
-            http_response_code(500);
-            header('Content-Type: application/json');
-            echo json_encode(['error' => $e->getMessage()]);
-        }
+            if ($owner && $repo) {
+                $stats = $this->githubService->getRepositoryStats($owner, $repo);
+                $this->sendSuccessResponse($stats);
+            }
+        });
     }
 }

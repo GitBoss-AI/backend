@@ -2,31 +2,22 @@
 namespace App\Controllers;
 use App\Services\GitHubService;
 
-class RecentActivityController
+class RecentActivityController extends BaseController
 {
     public function getRecentActivity()
     {
-        try {
-            $owner = $_GET['owner'] ?? $_ENV['GITHUB_OWNER'];
-            $repo = $_GET['repo'] ?? $_ENV['GITHUB_REPO'];
-            $limit = (int)($_GET['limit'] ?? 10);
-
-            if (!$owner || !$repo) {
-                http_response_code(400);
-                header('Content-Type: application/json');
-                echo json_encode(['error' => 'Owner and repo parameters are required']);
-                return;
-            }
-
-            $githubService = new GitHubService();
-            $activities = $githubService->getRecentActivity($owner, $repo, $limit);
+        $this->executeWithErrorHandling(function() {
+            $params = $this->validateParameters(['owner', 'repo'], ['limit' => 10]);
             
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'data' => $activities]);
-        } catch (\Exception $e) {
-            http_response_code(500);
-            header('Content-Type: application/json');
-            echo json_encode(['error' => $e->getMessage()]);
-        }
+            if ($params) {
+                $activities = $this->githubService->getRecentActivity(
+                    $params['owner'], 
+                    $params['repo'], 
+                    $params['limit']
+                );
+                
+                $this->sendSuccessResponse($activities);
+            }
+        });
     }
 }
