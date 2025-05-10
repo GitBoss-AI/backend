@@ -8,12 +8,23 @@ class DB {
     private $pdo;
 
     private function __construct() {
-        $config = require __DIR__ . '/../../config/config.php';
+    	// Load environment variables from .env file if it exists
+        $dotenvPath = __DIR__ . '/../../.env';
+        if (file_exists($dotenvPath)) {
+            $dotenv = \Dotenv\Dotenv::createImmutable(dirname($dotenvPath));
+            $dotenv->load();
+        }
+        
+        $host = $_ENV['DB_HOST'];
+        $dbname = $_ENV['DB_NAME'];
+        $user = $_ENV['DB_USER'];
+        $pass = $_ENV['DB_PASS'];
+        
         $this->pdo = new PDO(
-            "pgsql:host={$config['host']};dbname={$config['dbname']}",
-            $config['user'], $config['pass']
+            "pgsql:host=$host;dbname=$dbname",
+            $user, $pass
         );
-        $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);	
     }
 
     public static function getInstance(): self {

@@ -8,20 +8,19 @@ class UserService {
 	
     private $db;
     
-    public __construct() {
+    public function __construct() {
 	$this->db = DB::getInstance();
     }
 
     public function findUserByUsername(string $username): ?array {
     	return $this->db->selectOne(
 	    "SELECT * FROM users WHERE username = :username LIMIT 1",
-	    ['username' => username]
+	    ['username' => $username]
 	);
     }
 
     public function createUser(string $username, string $password): bool {
         $passwordHash = password_hash($password, PASSWORD_DEFAULT);
-        
     	return $this->db->insert('users', [
             'username' => $username,
             'password_hash' => $passwordHash
