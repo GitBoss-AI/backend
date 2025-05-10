@@ -7,10 +7,8 @@ class RepositoryStatsController
     public function getStats()
     {
         try {
-            $config = require __DIR__ . '/../config/config.php';
-            
-            $owner = $_GET['owner'] ?? $config['github']['default_owner'];
-            $repo = $_GET['repo'] ?? $config['github']['default_repo'];
+            $owner = $_GET['owner'] ?? $_ENV['GITHUB_OWNER'];
+            $repo = $_GET['repo'] ?? $_ENV['GITHUB_REPO'];
 
             if (!$owner || !$repo) {
                 http_response_code(400);
