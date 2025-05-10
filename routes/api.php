@@ -9,17 +9,20 @@ use App\Controllers\RecentActivityController;
 // Simple dispatcher
 $routes = [
     'POST' => [
+        // User
         '/api-dev/login'    => [UserController::class, 'login'],
         '/api-dev/register' => [UserController::class, 'register'],
+
+        // Repo
+        '/api-dev/repo/add' => [RepoController::class, 'addRepo'],
     ],
     'GET' => [
         // Health
         '/api-dev/health'   => [HealthController::class, 'check'],
 
         // Repo
-        '/api-dev/repo/add' => [RepoController::class, 'addRepo'],
-        '/api-dev/repo/getAll' => [RepoController::class, 'getAll'],
-        '/api-dev/repository-stats' => [RepositoryStatsController::class, 'getStats'],
+        '/api-dev/repo/getAll' => [RepoController::class, 'getAllRepos'],
+        '/api-dev/repo/stats' => [RepoController::class, 'getRepoStats'],
 
         // Team activity
         '/api-dev/team-activity/timeline' => [TeamActivityController::class, 'getTimeline'],

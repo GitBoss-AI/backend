@@ -2,7 +2,9 @@
 namespace App\Services;
 
 use App\Database\DB;
+use DateTime;
 use PDO;
+use PDOException;
 
 class RepoService {
     private $db;
@@ -62,5 +64,86 @@ class RepoService {
             WHERE go.user_id = :user_id",
             ['user_id' => $user_id]
         );
+    }
+
+    public function getStats(int $repo_url, ?string $timeWindow = null) {
+        $repo = $this->db->selectOne(
+            "SELECT id FROM repos WHERE url = :url",
+            ['url' => $repo_url]
+        );
+
+        if (!$repo) {
+            throw new \Exception("Repo not found.");
+        }
+
+        $repoId = $repo['id'];
+        $latest = $this->db->selectOne(
+            "SELECT * FROM repo_stats_snapshot
+             WHERE repo_id = :repo_id
+             ORDER BY snapshot_date DESC
+             LIMIT 1",
+            ['repo_id' => $repoId]
+        );
+
+        if (!$latest) {
+            // TODO: get stats from github api
+            throw new \Exception("No snapshot data available.");
+        }
+
+        // If no timeWindow is given just return the latest stats
+        if (!$timeWindow) {
+            return [
+                'date' => $latest['snapshot_date'],
+                'stats' => $this->stripRepoFields($latest)
+            ];
+        }
+
+        // Compute the start date threshold
+        try {
+            $startDate = $this->getStartDate($timeWindow);
+        } catch (\Exception $e) {
+            throw new \Exception("Invalid time_window: " . $e->getMessage());
+        }
+
+        $earlier = $this->db->selectOne(
+            "SELECT * FROM repo_stats_snapshot
+            WHERE repo_id = :repo_id AND snapshot_date <= :start_date
+            ORDER BY snapshot_date DESC
+            LIMIT 1",
+            ['repo_id' => $repoId, 'start_date' => $startDate]
+        );
+
+        if (!$earlier) {
+            throw new \Exception("No snapshot found at or before start of time window.");
+        }
+
+        // Compute deltas
+        return [
+            'from' => $earlier['snapshot_date'],
+            'to' => $latest['snapshot_date'],
+            'stats' => [
+                'commits'    => $latest['commits']    - $earlier['commits'],
+                'open_prs'   => $latest['open_prs']   - $earlier['open_prs'],
+                'closed_prs' => $latest['closed_prs'] - $earlier['closed_prs'],
+                'issues'     => $latest['issues']     - $earlier['issues'],
+                'reviews'    => $latest['reviews']    - $earlier['reviews'],
+            ]
+        ];
+    }
+
+    private function stripRepoFields(array $row) {
+        unset($row['id'], $row['repo_id'], $row['snapshot_date']);
+        return $row;
+    }
+
+    private function getStartDate(string $timeWindow) {
+        $interval = match (true) {
+            preg_match('/^(\d+)d$/', $timeWindow, $m) => "{$m[1]} days",
+            preg_match('/^(\d+)w$/', $timeWindow, $m) => (7 * $m[1]) . " days",
+            preg_match('/^(\d+)m$/', $timeWindow, $m) => "{$m[1]} months",
+            default => throw new \Exception("Invalid time_window format. Use Nd, Nw, or Nm.")
+        };
+
+        return (new DateTime())->modify("-$interval")->format('Y-m-d');
     }
 }
