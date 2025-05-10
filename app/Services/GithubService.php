@@ -363,9 +363,28 @@ class GitHubService
     private function calculatePeriodChange($repoId)
     {
         try {
+            // Changed: Get current week and last week data instead of last week and two weeks ago
+            $today = date('Y-m-d');
             $lastWeek = date('Y-m-d', strtotime('-7 days'));
-            $twoWeeksAgo = date('Y-m-d', strtotime('-14 days'));
             
+            // Get latest snapshot for current week (today)
+            $currentWeekStats = $this->db->selectOne(
+                "SELECT * FROM repo_stats_snapshot 
+                 WHERE repo_id = :repo_id AND snapshot_date = :date",
+                ['repo_id' => $repoId, 'date' => $today]
+            );
+            
+            // If no current week stats, get the latest available
+            if (!$currentWeekStats) {
+                $currentWeekStats = $this->db->selectOne(
+                    "SELECT * FROM repo_stats_snapshot 
+                     WHERE repo_id = :repo_id
+                     ORDER BY snapshot_date DESC LIMIT 1",
+                    ['repo_id' => $repoId]
+                );
+            }
+            
+            // Get stats from last week
             $lastWeekStats = $this->db->selectOne(
                 "SELECT * FROM repo_stats_snapshot 
                  WHERE repo_id = :repo_id AND snapshot_date <= :date 
@@ -373,20 +392,13 @@ class GitHubService
                 ['repo_id' => $repoId, 'date' => $lastWeek]
             );
             
-            $prevWeekStats = $this->db->selectOne(
-                "SELECT * FROM repo_stats_snapshot 
-                 WHERE repo_id = :repo_id AND snapshot_date <= :date 
-                 ORDER BY snapshot_date DESC LIMIT 1",
-                ['repo_id' => $repoId, 'date' => $twoWeeksAgo]
-            );
-            
             $metrics = ['commits', 'open_prs', 'issues', 'reviews'];
             $changes = [];
             
             foreach ($metrics as $metric) {
-                if ($lastWeekStats && $prevWeekStats && $prevWeekStats[$metric] > 0) {
+                if ($currentWeekStats && $lastWeekStats && $lastWeekStats[$metric] > 0) {
                     $changes[$metric] = round(
-                        (($lastWeekStats[$metric] - $prevWeekStats[$metric]) / $prevWeekStats[$metric]) * 100, 
+                        (($currentWeekStats[$metric] - $lastWeekStats[$metric]) / $lastWeekStats[$metric]) * 100, 
                         1
                     );
                 } else {
@@ -408,11 +420,12 @@ class GitHubService
         
         foreach ($metrics as $metric) {
             try {
+                // Changed: Get current week (offset 0) and last week (offset -1)
+                $currentWeek = $this->getMetricCount($metric, $owner, $repo, 0);
                 $lastWeek = $this->getMetricCount($metric, $owner, $repo, -1);
-                $prevWeek = $this->getMetricCount($metric, $owner, $repo, -2);
                 
-                $changes[$metric] = $prevWeek > 0 ? 
-                    round((($lastWeek - $prevWeek) / $prevWeek) * 100, 1) : 0;
+                $changes[$metric] = $lastWeek > 0 ? 
+                    round((($currentWeek - $lastWeek) / $lastWeek) * 100, 1) : 0;
             } catch (\Exception $e) {
                 $changes[$metric] = 0;
             }
@@ -443,11 +456,27 @@ class GitHubService
 
     private function getWeekRange($weekNumber)
     {
-        $start = strtotime("Monday +" . ($weekNumber * 7) . " days");
-        $end = strtotime("Sunday +" . ($weekNumber * 7) . " days");
+        // Changed: Updated to handle current week (0) and previous weeks
+        // weekNumber = 0 is current week, -1 is last week, -2 is two weeks ago, etc.
+        $startOffset = $weekNumber * 7;
+        $endOffset = ($weekNumber * 7) + 6;
+        
+        // Calculate the start of the week (Monday)
+        $now = new \DateTime();
+        $currentDayOfWeek = (int)$now->format('N'); // 1 (Monday) through 7 (Sunday)
+        
+        // Adjust to get the start (Monday) of the current week
+        $mondayOffset = -($currentDayOfWeek - 1) + $startOffset;
+        $start = new \DateTime();
+        $start->modify("$mondayOffset days");
+        
+        // End is Sunday of the same week (6 days after Monday)
+        $end = clone $start;
+        $end->modify('+6 days');
+        
         return [
-            'start' => date('Y-m-d', $start),
-            'end' => date('Y-m-d', $end)
+            'start' => $start->format('Y-m-d'),
+            'end' => $end->format('Y-m-d')
         ];
     }
 
