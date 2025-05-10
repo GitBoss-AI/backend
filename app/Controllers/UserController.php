@@ -67,7 +67,7 @@ class UserController {
             if (str_contains($msg, 'username')) {
                 http_response_code(409);
                 echo json_encode(['error' => 'Username already exists']);
-            } elseif (str_contains($msg, 'github owner')) {
+            } elseif (stripos($msg, 'github owner') !== false) {
                 http_response_code(409);
                 echo json_encode(['error' => $msg]);
             } else {
