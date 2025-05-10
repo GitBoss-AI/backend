@@ -57,7 +57,7 @@ class JWTService {
             $payload = json_decode($this->base64UrlDecode($payload_b64), true);
 
             // Check expiration
-            if (isset($payload['exp']) && $payload['exp'] < time()) {
+            if (isset($payload['expiration']) && $payload['expiration'] < time()) {
                 return null;
             }
 
