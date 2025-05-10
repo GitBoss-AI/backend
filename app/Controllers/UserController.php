@@ -51,18 +51,29 @@ class UserController {
         header('Content-Type: application/json');
 
         $input = json_decode(file_get_contents("php://input"), true);
-        if (!$input || !isset($input['username'], $input['password'])) {
+        if (!$input || !isset($input['username'], $input['github_ownership'], $input['password'])) {
             http_response_code(400);
             echo json_encode(['error' => 'Missing fields']);
             return;
         }
 
+        $owners = array_map('trim', explode(',', $input['github_ownership']));
+
         try {
-            $this->userService->createUser($input['username'], $input['password']);
+            $this->userService->createUser($input['username'], $owners, $input['password']);
             echo json_encode(['message' => 'User created']);
-        } catch (\PDOException $e) {
-            http_response_code(409);
-            echo json_encode(['error' => 'Username already exists']);
+        } catch (\Exception $e) {
+            $msg = $e->getMessage();
+            if (str_contains($msg, 'username')) {
+                http_response_code(409);
+                echo json_encode(['error' => 'Username already exists']);
+            } elseif (str_contains($msg, 'github owner')) {
+                http_response_code(409);
+                echo json_encode(['error' => $msg]);
+            } else {
+                http_response_code(500);
+                echo json_encode(['error' => 'Database error', 'details' => $msg]);
+            }
         }
     }
 }
