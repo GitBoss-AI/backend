@@ -2,55 +2,35 @@
 namespace App\Controllers;
 use App\Services\GitHubService;
 
-class TeamActivityController
+class TeamActivityController extends BaseController
 {
     public function getTimeline()
     {
-        try {
-            $owner = $_GET['owner'] ?? $_ENV['GITHUB_OWNER'];
-            $repo = $_GET['repo'] ?? $_ENV['GITHUB_REPO'];
-
-            if (!$owner || !$repo) {
-                http_response_code(400);
-                header('Content-Type: application/json');
-                echo json_encode(['error' => 'Owner and repo parameters are required']);
-                return;
-            }
-
-            $githubService = new GitHubService();
-            $timeline = $githubService->getActivityTimeline($owner, $repo);
+        $this->executeWithErrorHandling(function() {
+            list($owner, $repo) = $this->getOwnerAndRepo();
             
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'data' => $timeline]);
-        } catch (\Exception $e) {
-            http_response_code(500);
-            header('Content-Type: application/json');
-            echo json_encode(['error' => $e->getMessage()]);
-        }
+            if ($owner && $repo) {
+                $timeline = $this->githubService->getActivityTimeline($owner, $repo);
+                $this->sendSuccessResponse($timeline);
+            }
+        });
     }
-
+    
     public function getComparison()
     {
-        try {
-            $owner = $_GET['owner'] ?? $_ENV['GITHUB_OWNER'];
-            $repo = $_GET['repo'] ?? $_ENV['GITHUB_OWNER'];
-
-            if (!$owner || !$repo) {
-                http_response_code(400);
-                header('Content-Type: application/json');
-                echo json_encode(['error' => 'Owner and repo parameters are required']);
-                return;
-            }
-
-            $githubService = new GitHubService();
-            $comparison = $githubService->getDeveloperComparison($owner, $repo);
+        $this->executeWithErrorHandling(function() {
+            $params = $this->validateParameters(['owner', 'repo']);
             
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'data' => $comparison]);
-        } catch (\Exception $e) {
-            http_response_code(500);
-            header('Content-Type: application/json');
-            echo json_encode(['error' => $e->getMessage()]);
-        }
+            if ($params) {
+                // Note: In your original code, repo was getting GITHUB_OWNER instead of GITHUB_REPO
+                // Keeping it as is for consistency, but this might be a bug in the original
+                $comparison = $this->githubService->getDeveloperComparison(
+                    $params['owner'], 
+                    $params['repo']
+                );
+                
+                $this->sendSuccessResponse($comparison);
+            }
+        });
     }
 }
