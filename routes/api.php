@@ -33,6 +33,6 @@ if (isset($routes[$method][$uri])) {
     (new $class)->$methodName();
 } else {
     http_response_code(404);
-    echo json_encode(['error' => 'Wait what??']);
+    return json_encode(['error' => 'Not found']);
 }
 
