@@ -25,58 +25,76 @@ class GitHubService
     public function getRepositoryStats($owner, $repo)
     {
         try {
-            // Get repo from database or create
-            $repoData = $this->getOrCreateRepo($owner, $repo);
+            // Get repo from database or create with flag indicating if it's new
+            $repoResult = $this->getOrCreateRepo($owner, $repo);
+            $repoData = $repoResult['data'];
+            $isNewRepo = $repoResult['is_new'];
             $repoId = $repoData['id'];
             
-            // Check if we have recent stats (today)
-            $today = date('Y-m-d');
-            $snapshot = $this->db->selectOne(
-                "SELECT * FROM repo_stats_snapshot WHERE repo_id = :repo_id AND snapshot_date = :date",
-                ['repo_id' => $repoId, 'date' => $today]
-            );
-            
-            if (!$snapshot) {
-                // Fetch fresh data from GitHub API
-                $contributors = $this->paginate("repos/{$owner}/{$repo}/stats/contributors");
-                $totalCommits = array_sum(array_column($contributors, 'total'));
+            // If existing repo, return latest snapshot or force fresh data
+            if (!$isNewRepo) {
+                $latestSnapshot = $this->db->selectOne(
+                    "SELECT * FROM repo_stats_snapshot 
+                     WHERE repo_id = :repo_id 
+                     ORDER BY snapshot_date DESC 
+                     LIMIT 1",
+                    ['repo_id' => $repoId]
+                );
                 
-                $allOpenPRs = $this->paginate("repos/{$owner}/{$repo}/pulls", ['state' => 'open']);
-                $allClosedPRs = $this->paginate("repos/{$owner}/{$repo}/pulls", ['state' => 'closed']);
-                
-                $allIssues = $this->paginate("repos/{$owner}/{$repo}/issues", ['state' => 'open']);
-                $activeIssues = array_filter($allIssues, fn($issue) => !isset($issue['pull_request']));
-                
-                $codeReviews = $this->getCodeReviewsCount($owner, $repo);
-                
-                // Store snapshot in database
-                $snapshot = [
-                    'repo_id' => $repoId,
-                    'snapshot_date' => $today,
-                    'commits' => $totalCommits,
-                    'open_prs' => count($allOpenPRs),
-                    'closed_prs' => count($allClosedPRs),
-                    'issues' => count($activeIssues),
-                    'reviews' => $codeReviews
-                ];
-                
-                $this->db->insert('repo_stats_snapshot', $snapshot);
-                
-                // Sync contributors
-                $this->syncContributors($repoId, $contributors);
+                if ($latestSnapshot) {
+                    $lastPeriodChange = $this->calculatePeriodChange($repoId);
+                    
+                    return [
+                        'total_commits' => (int)$latestSnapshot['commits'],
+                        'open_prs' => (int)$latestSnapshot['open_prs'],
+                        'closed_prs' => (int)$latestSnapshot['closed_prs'],
+                        'code_reviews' => (int)$latestSnapshot['reviews'],
+                        'active_issues' => (int)$latestSnapshot['issues'],
+                        'last_period_change' => $lastPeriodChange
+                    ];
+                }
             }
+            
+            // For new repos OR if no snapshot exists, fetch fresh data from GitHub API
+            $contributors = $this->paginate("repos/{$owner}/{$repo}/stats/contributors");
+            $totalCommits = array_sum(array_column($contributors, 'total'));
+            
+            $allOpenPRs = $this->paginate("repos/{$owner}/{$repo}/pulls", ['state' => 'open']);
+            $allClosedPRs = $this->paginate("repos/{$owner}/{$repo}/pulls", ['state' => 'closed']);
+            
+            $allIssues = $this->paginate("repos/{$owner}/{$repo}/issues", ['state' => 'open']);
+            $activeIssues = array_filter($allIssues, fn($issue) => !isset($issue['pull_request']));
+            
+            $codeReviews = $this->getCodeReviewsCount($owner, $repo);
+            
+            // Store snapshot in database
+            $today = date('Y-m-d');
+            $snapshot = [
+                'repo_id' => $repoId,
+                'snapshot_date' => $today,
+                'commits' => $totalCommits,
+                'open_prs' => count($allOpenPRs),
+                'closed_prs' => count($allClosedPRs),
+                'issues' => count($activeIssues),
+                'reviews' => $codeReviews
+            ];
+            
+            $this->db->insert('repo_stats_snapshot', $snapshot);
+            
+            // Removed: Sync contributors - will be handled by workers
             
             $lastPeriodChange = $this->calculatePeriodChange($repoId);
             
             // Ensure integers are returned as integers
             return [
-                'total_commits' => (int)$snapshot['commits'],
-                'open_prs' => (int)$snapshot['open_prs'],
-                'closed_prs' => (int)$snapshot['closed_prs'],
-                'code_reviews' => (int)$snapshot['reviews'],
-                'active_issues' => (int)$snapshot['issues'],
+                'total_commits' => $totalCommits,
+                'open_prs' => count($allOpenPRs),
+                'closed_prs' => count($allClosedPRs),
+                'code_reviews' => $codeReviews,
+                'active_issues' => count($activeIssues),
                 'last_period_change' => $lastPeriodChange
             ];
+            
         } catch (\Exception $e) {
             // Fall back to API-only approach on database errors
             $contributors = $this->paginate("repos/{$owner}/{$repo}/stats/contributors");
@@ -89,7 +107,7 @@ class GitHubService
             $activeIssues = array_filter($allIssues, fn($issue) => !isset($issue['pull_request']));
             
             $codeReviews = $this->getCodeReviewsCount($owner, $repo);
-            $lastPeriodChange = $this->calculatePeriodChange($owner, $repo);
+            $lastPeriodChange = $this->calculatePeriodChangeFromAPI($owner, $repo);
             
             return [
                 'total_commits' => $totalCommits,
@@ -105,7 +123,8 @@ class GitHubService
     public function getActivityTimeline($owner, $repo)
     {
         try {
-            $repoData = $this->getOrCreateRepo($owner, $repo);
+            $repoResult = $this->getOrCreateRepo($owner, $repo);
+            $repoData = $repoResult['data'];
             $repoId = $repoData['id'];
         } catch (\Exception $e) {
             // Continue without database if there's an error
@@ -135,7 +154,8 @@ class GitHubService
     public function getDeveloperComparison($owner, $repo)
     {
         try {
-            $repoData = $this->getOrCreateRepo($owner, $repo);
+            $repoResult = $this->getOrCreateRepo($owner, $repo);
+            $repoData = $repoResult['data'];
             $repoId = $repoData['id'];
             
             // Get all contributors for this repo
@@ -293,28 +313,26 @@ class GitHubService
         );
         
         if ($existingRepo) {
-            return $existingRepo;
+            // Return existing repo with flag indicating it already exists
+            return [
+                'data' => $existingRepo,
+                'is_new' => false
+            ];
         }
         
-        // Get or create owner
-        $ownerData = $this->db->selectOne(
-            "SELECT * FROM users WHERE username = :username",
-            ['username' => $owner]
+        // Find user by GitHub ownership using the new github_ownerships table
+        $ownershipData = $this->db->selectOne(
+            "SELECT u.* FROM users u
+             JOIN github_ownerships go ON u.id = go.user_id
+             WHERE go.owner = :owner",
+            ['owner' => $owner]
         );
         
-        if (!$ownerData) {
-            $this->db->insert('users', ['username' => $owner]);
-            $ownerData = $this->db->selectOne(
-                "SELECT * FROM users WHERE username = :username",
-                ['username' => $owner]
-            );
-        }
-        
-        // Create repo
+        // Create repo (owner_id can be null if no user owns this GitHub account)
         $this->db->insert('repos', [
-            'name' => $repo,
+            'name' => $owner . '/' . $repo,
             'url' => $repoUrl,
-            'owner_id' => $ownerData['id'] ?? null,
+            'owner_id' => $ownershipData['id'] ?? null,
             'last_updated' => date('Y-m-d H:i:s')
         ]);
         
@@ -323,11 +341,11 @@ class GitHubService
             ['url' => $repoUrl]
         );
         
-        // Create user-repo relationship
-        if ($ownerData && $repoData) {
+        // Create user-repo relationship if user owns this GitHub account
+        if ($ownershipData && $repoData) {
             try {
                 $this->db->insert('user_has_repo', [
-                    'user_id' => $ownerData['id'],
+                    'user_id' => $ownershipData['id'],
                     'repo_id' => $repoData['id']
                 ]);
             } catch (\Exception $e) {
@@ -335,85 +353,11 @@ class GitHubService
             }
         }
         
-        return $repoData;
-    }
-    
-    private function syncContributors($repoId, $contributors)
-    {
-        foreach ($contributors as $contributorData) {
-            try {
-                $githubUsername = $contributorData['author']['login'];
-                
-                // Get or create contributor
-                $contributor = $this->db->selectOne(
-                    "SELECT * FROM contributors WHERE github_username = :username",
-                    ['username' => $githubUsername]
-                );
-                
-                if (!$contributor) {
-                    $this->db->insert('contributors', ['github_username' => $githubUsername]);
-                    $contributor = $this->db->selectOne(
-                        "SELECT * FROM contributors WHERE github_username = :username",
-                        ['username' => $githubUsername]
-                    );
-                }
-                
-                // Update repo-contributor relationship
-                $relationship = $this->db->selectOne(
-                    "SELECT * FROM repo_has_contributor 
-                     WHERE repo_id = :repo_id AND contributor_id = :contributor_id",
-                    ['repo_id' => $repoId, 'contributor_id' => $contributor['id']]
-                );
-                
-                if (!$relationship) {
-                    $this->db->insert('repo_has_contributor', [
-                        'repo_id' => $repoId,
-                        'contributor_id' => $contributor['id'],
-                        'first_seen' => date('Y-m-d'),
-                        'last_seen' => date('Y-m-d')
-                    ]);
-                } else {
-                    $this->db->execute(
-                        "UPDATE repo_has_contributor 
-                         SET last_seen = :date 
-                         WHERE repo_id = :repo_id AND contributor_id = :contributor_id",
-                        [
-                            'date' => date('Y-m-d'),
-                            'repo_id' => $repoId,
-                            'contributor_id' => $contributor['id']
-                        ]
-                    );
-                }
-                
-                // Create contributor stats snapshot
-                $today = date('Y-m-d');
-                $existingStats = $this->db->selectOne(
-                    "SELECT * FROM contributor_stats_snapshot 
-                     WHERE contributor_id = :contributor_id 
-                       AND repo_id = :repo_id 
-                       AND snapshot_date = :date",
-                    [
-                        'contributor_id' => $contributor['id'],
-                        'repo_id' => $repoId,
-                        'date' => $today
-                    ]
-                );
-                
-                if (!$existingStats) {
-                    $this->db->insert('contributor_stats_snapshot', [
-                        'contributor_id' => $contributor['id'],
-                        'repo_id' => $repoId,
-                        'snapshot_date' => $today,
-                        'commits' => $contributorData['total'],
-                        'prs_opened' => 0, // Will be updated by getDeveloperComparison
-                        'reviews' => 0     // Will be updated by getDeveloperComparison
-                    ]);
-                }
-            } catch (\Exception $e) {
-                // Skip this contributor on error
-                continue;
-            }
-        }
+        // Return new repo with flag indicating it's new
+        return [
+            'data' => $repoData,
+            'is_new' => true
+        ];
     }
     
     private function calculatePeriodChange($repoId)
@@ -453,7 +397,7 @@ class GitHubService
             return $changes;
         } catch (\Exception $e) {
             // Fallback to API-based calculation
-            return $this->calculatePeriodChangeFromAPI($owner ?? '', $repo ?? '');
+            return $this->calculatePeriodChangeFromAPI('', '');
         }
     }
     
