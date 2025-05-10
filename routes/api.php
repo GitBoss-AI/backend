@@ -1,7 +1,9 @@
 <?php
-
 use App\Controllers\UserController;
 use App\Controllers\HealthController;
+use App\Controllers\RepositoryStatsController;
+use App\Controllers\TeamActivityController;
+use App\Controllers\RecentActivityController;
 
 // Simple dispatcher
 $routes = [
@@ -11,6 +13,10 @@ $routes = [
     ],
     'GET' => [
         '/api-dev/health'   => [HealthController::class, 'check'],
+        '/api-dev/repository-stats' => [RepositoryStatsController::class, 'getStats'],
+        '/api-dev/team-activity/timeline' => [TeamActivityController::class, 'getTimeline'],
+        '/api-dev/team-activity/comparison' => [TeamActivityController::class, 'getComparison'],
+        '/api-dev/recent-activity' => [RecentActivityController::class, 'getRecentActivity'],
     ],
 ];
 
