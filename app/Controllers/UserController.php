@@ -1,13 +1,16 @@
 <?php
 namespace App\Controllers;
 
+use App\Services\JWTService;
 use App\Services\UserService;
 
 class UserController {
     private UserService $userService;
+    private JWTService $jwtService;
 
     public function __construct() {
         $this->userService = new UserService();
+        $this->jwtService = new JWTService();
     }
 
     public function login() {
@@ -27,7 +30,21 @@ class UserController {
             return;
         }
 
-        echo json_encode(['message' => 'Login successful', 'user_id' => $user['id']]);
+        // Generate JWT token using the service
+        $token = $this->jwtService->generateToken([
+            'id' => $user['id'],
+            'username' => $user['username']
+        ]);
+
+        $payload = $this->jwtService->validateToken($token);
+
+        // Return success with token
+        echo json_encode([
+            'message' => 'Login successful',
+            'user_id' => $user['id'],
+            'token' => $token,
+            'expires' => $payload['exp']
+        ]);
     }
 
     public function register() {
