@@ -25,11 +25,11 @@ $routes = [
         '/api-dev/repo/stats' => [RepoController::class, 'getRepoStats'],
 
         // Team activity
-        '/api-dev/team-activity/timeline' => [TeamActivityController::class, 'getTimeline'],
-        '/api-dev/team-activity/comparison' => [TeamActivityController::class, 'getComparison'],
+        //'/api-dev/team-activity/timeline' => [TeamActivityController::class, 'getTimeline'],
+        //'/api-dev/team-activity/comparison' => [TeamActivityController::class, 'getComparison'],
 
         // Activity feed
-        '/api-dev/recent-activity' => [RecentActivityController::class, 'getRecentActivity'],
+        //'/api-dev/recent-activity' => [RecentActivityController::class, 'getRecentActivity'],
     ],
 ];
 
