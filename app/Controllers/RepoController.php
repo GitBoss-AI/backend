@@ -35,14 +35,12 @@ class RepoController {
     public function getAllRepos() {
         header('Content-Type: application/json');
 
-        $input = json_decode(file_get_contents("php://input"), true);
-        if (!$input || !isset($input['user_id'])) {
+        $user_id = $_GET['user_id'] ?? null;
+        if (!$user_id) {
             http_response_code(400);
-            echo json_encode(['error' => 'Missing fields']);
+            echo json_encode(['error' => 'Missing user_id']);
             return;
         }
-
-        $user_id = $input['user_id'];
 
         try {
             $allRepos = $this->repoService->getAll($user_id);
@@ -60,18 +58,16 @@ class RepoController {
     public function getRepoStats() {
         header('Content-Type: application/json');
 
-        $input = json_decode(file_get_contents("php://input"), true);
-        if (!$input || !isset($input['repo_url'])) {
+        $repoUrl = $_GET['repo_url'] ?? null;
+        $timeWindow = $_GET['time_window'] ?? null;
+        if (!$repoUrl) {
             http_response_code(400);
-            echo json_encode(['error' => 'Missing fields']);
+            echo json_encode(['error' => 'Missing repo_url']);
             return;
         }
 
-        $url = $input['repo_url'];
-        $timeWindow = $_GET['time_window'] ?? null;
-
         try {
-            $repoStats = $this->repoService->getStats($url, $timeWindow);
+            $repoStats = $this->repoService->getStats($repoUrl, $timeWindow);
             http_response_code(200);
             echo json_encode([
                 'message' => 'Repos stats successfully retrieved.',
