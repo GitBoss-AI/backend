@@ -21,7 +21,7 @@ foreach ($repos as $repo) {
     try {
         $stats = [
             'repo_id' => $repoId,
-            'snapshot_date' => date('Y-m-d'),
+            'snapshot_date' => date('Y-m-d H:i:s'),
             'commits'       => $repoService->getRepoCommitCount($owner, $name),
             'open_prs'      => $repoService->getRepoOpenPrCount($owner, $name),
             'merged_prs'    => $repoService->getRepoMergedPrCount($owner, $name),
