@@ -83,7 +83,7 @@ class RepoService {
         );
     }
 
-    public function getStats(string $repo_url, ?string $timeWindow = null) {
+    public function getStats(string $repo_url, string $timeWindow) {
         $repo = $this->db->selectOne(
             "SELECT id FROM repos WHERE url = :url",
             ['url' => $repo_url]
@@ -197,14 +197,20 @@ class RepoService {
         return $row;
     }
 
-    private function getStartDate(string $timeWindow) {
-        $interval = match (true) {
-            preg_match('/^(\d+)d$/', $timeWindow, $m) => "{$m[1]} days",
-            preg_match('/^(\d+)w$/', $timeWindow, $m) => (7 * $m[1]) . " days",
-            preg_match('/^(\d+)m$/', $timeWindow, $m) => "{$m[1]} months",
-            default => throw new \Exception("Invalid time_window format. Use Nd, Nw, or Nm.")
-        };
+    private function getStartDate(string $timeWindow): string {
+        $patterns = [
+            '/^(\d+)d$/' => fn($m) => "{$m[1]} days",
+            '/^(\d+)w$/' => fn($m) => (7 * (int)$m[1]) . " days",
+            '/^(\d+)m$/' => fn($m) => "{$m[1]} months",
+        ];
 
-        return (new DateTime())->modify("-$interval")->format('Y-m-d');
+        foreach ($patterns as $pattern => $handler) {
+            if (preg_match($pattern, $timeWindow, $m)) {
+                $interval = $handler($m);
+                return (new DateTime())->modify("-$interval")->format('Y-m-d');
+            }
+        }
+
+        throw new \Exception("Invalid time_window format. Use Nd, Nw, or Nm.");
     }
 }
