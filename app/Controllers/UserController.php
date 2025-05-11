@@ -24,7 +24,7 @@ class UserController {
         }
 
         $user = $this->userService->findUserByUsername($input['username']);
-        if (!$user || !$this->userService->verifyPassword($input['password'], $user['password_hash'])) {
+        if (!$user || !$this->userService->verifyPassword($input['password'], $user['password'])) {
             http_response_code(401);
             echo json_encode(['error' => 'Invalid username or password']);
             return;
