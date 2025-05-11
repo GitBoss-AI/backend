@@ -16,6 +16,8 @@ class ContributorController
 
         $githubUsername = $_GET["github_username"] ?? null;
         $timeWindow = $_GET["time_window"] ?? null;
+        $repoId = (int) $_GET["repo_id"] ?? null;
+        $userId = (int) $_GET["user_id"] ?? null;
 
         if (!$githubUsername) {
             http_response_code(400);
@@ -24,7 +26,12 @@ class ContributorController
         }
 
         try {
-            $contributorStats = $this->contributorService->getStats($githubUsername, $timeWindow);
+            $contributorStats = $this->contributorService->getStats(
+                $githubUsername,
+                $timeWindow,
+                $repoId,
+                $userId
+            );
             http_response_code(200);
             echo json_encode([
                 'message' => 'Contributor stats successfully retrieved',

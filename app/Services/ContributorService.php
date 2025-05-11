@@ -48,7 +48,12 @@ class ContributorService extends BaseService {
         }
     }
 
-    public function getStats(string $githubUsername, string $timeWindow) {
+    public function getStats(
+        string $githubUsername,
+        string $timeWindow,
+        ?int $repoId = null,
+        ?int $userId = null
+    ) {
         $contributor = $this->db->selectOne(
             "SELECT id FROM contributors WHERE github_username = :username",
             ['username' => $githubUsername]
@@ -59,12 +64,35 @@ class ContributorService extends BaseService {
         }
 
         $contributorId = $contributor['id'];
+
+        // If repo/user provided, verify user owns repo
+        if ($repoId !== null && $userId !== null) {
+            $ownership = $this->db->selectOne(
+                "SELECT r.id FROM repos r
+             JOIN github_ownerships go ON r.owner = go.owner
+             WHERE r.id = :repo_id AND go.user_id = :user_id",
+                ['repo_id' => $repoId, 'user_id' => $userId]
+            );
+
+            if (!$ownership) {
+                throw new \Exception("User does not own the requested repository.");
+            }
+        }
+
+        $conditions = "contributor_id = :contributor_id";
+        $params = ['contributor_id' => $contributorId];
+
+        if ($repoId !== null) {
+            $conditions .= " AND repo_id = :repo_id";
+            $params['repo_id'] = $repoId;
+        }
+
         $latest = $this->db->selectOne(
             "SELECT * FROM contributor_stats
-             WHERE contributor_id = :contributor_id
+             WHERE $conditions
              ORDER BY snapshot_date DESC
              LIMIT 1",
-            ['contributor_id' => $contributorId]
+            $params
         );
 
         if (!$latest) {
@@ -89,10 +117,10 @@ class ContributorService extends BaseService {
 
         $earlier = $this->db->selectOne(
             "SELECT * FROM contributor_stats
-            WHERE contributor_id = :contributor_id AND snapshot_date <= :start_date
+            WHERE $conditions AND snapshot_date <= :start_date
             ORDER BY snapshot_date DESC
             LIMIT 1",
-            ['contributor_id' => $contributorId, 'start_date' => $startDate]
+            array_merge($params, ['start_date' => $startDate])
         );
 
         if (!$earlier) {
