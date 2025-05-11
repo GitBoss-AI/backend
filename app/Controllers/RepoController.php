@@ -67,7 +67,7 @@ class RepoController {
             return;
         }
 
-        $url = $input['url'];
+        $url = $input['repo_url'];
         $timeWindow = $_GET['time_window'] ?? null;
 
         try {
