@@ -71,7 +71,7 @@ class RepoService extends BaseService {
         );
     }
 
-    public function getStats(string $repo_url, string $timeWindow) {
+    public function getStats(string $repo_url, ?string $timeWindow = null) {
         $repo = $this->db->selectOne(
             "SELECT id FROM repos WHERE url = :url",
             ['url' => $repo_url]

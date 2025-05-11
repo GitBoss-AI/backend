@@ -50,7 +50,7 @@ class ContributorService extends BaseService {
 
     public function getStats(
         string $githubUsername,
-        string $timeWindow,
+        ?string $timeWindow = null,
         ?int $repoId = null,
         ?int $userId = null
     ) {

@@ -21,7 +21,7 @@ $activityWorker = "$php $projectRoot/app/Cronjob/ContributorActivityWorker.php >
 
 // Register them
 $cron = new CronManager();
-$cron->addJob('0 1 * * *', $repoWorker);        // sync at 01:00
-$cron->addJob('0 1 * * *', $contribWorker);     // sync at 01:00
-$cron->addJob('10 1 * * *', $activityWorker);   // sync at 01:10 -> after contributions are calculated
+$cron->addJob('0 * * * *', $repoWorker);        // at every minute 0
+$cron->addJob('0 * * * *', $contribWorker);     // at every minute 0
+$cron->addJob('10 * * * *', $activityWorker);   // at every minute 10 -> after contributions are calculated
 $cron->install();
