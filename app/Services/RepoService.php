@@ -58,9 +58,11 @@ class RepoService {
         ];
         $this->db->insert('repos', $repoData);
 
+        $newRepoId = $this->db->selectOne("SELECT id FROM repos ORDER BY id DESC LIMIT 1");
+
         // Fetch stats from github api and create stats snapshot
         $repoStatsData = [
-            'repo_id' => $repo['id'],
+            'repo_id' => $newRepoId,
             'snapshot_date' => date('Y-m-d H:i:s'),
             'commits' => $this->getCommitCount($repoOwner, $repoName),
             'open_prs' => $this->getOpenPrCount($repoOwner, $repoName),
@@ -81,7 +83,7 @@ class RepoService {
         );
     }
 
-    public function getStats(int $repo_url, ?string $timeWindow = null) {
+    public function getStats(string $repo_url, ?string $timeWindow = null) {
         $repo = $this->db->selectOne(
             "SELECT id FROM repos WHERE url = :url",
             ['url' => $repo_url]
