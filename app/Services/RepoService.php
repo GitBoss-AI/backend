@@ -188,7 +188,7 @@ class RepoService {
     }
 
     private function getSearchCount(string $q) {
-        $result = $this->githubClient->getPaginated("search/issues", ['q' => $q]);
+        $result = $this->githubClient->get("search/issues", ['q' => $q]);
         return $result['total_count'];
     }
 

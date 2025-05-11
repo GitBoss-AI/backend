@@ -42,6 +42,11 @@ class UserService {
             }
 
             // Insert ownerships
+            $userId = $this->db->selectOne(
+                "SELECT id FROM users WHERE username = :username LIMIT 1",
+                ['username' => $username]
+            );
+
             foreach ($owners as $owner) {
                 $this->db->insert('github_ownerships', [
                     'user_id' => $userId,
