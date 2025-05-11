@@ -3,17 +3,13 @@ namespace App\Services;
 
 use App\Database\DB;
 use DateTime;
-use PDO;
-use PDOException;
 
 class RepoService {
     private $db;
-    private $githubService;
     private $githubClient;
 
     public function __construct() {
         $this->db = DB::getInstance();
-        $this->githubService = new GitHubService();
         $this->githubClient = new GithubClient();
     }
 
@@ -38,7 +34,7 @@ class RepoService {
         }
 
         // Insert repo to database
-        $parsedUrl = $this->githubService->parseGithubUrl($repo_url);
+        $parsedUrl = $this->parseGithubUrl($repo_url);
         $repoOwner = $parsedUrl['owner'];
         $repoName = $parsedUrl['name'];
 
@@ -190,6 +186,16 @@ class RepoService {
     private function getSearchCount(string $q) {
         $result = $this->githubClient->get("search/issues", ['q' => $q]);
         return $result['total_count'];
+    }
+
+    private function parseGithubUrl(string $url) {
+        if (preg_match('#github\.com/([^/]+)/([^/]+)#', $url, $matches)) {
+            return [
+                'owner' => $matches[1],
+                'name'  => $matches[2]
+            ];
+        }
+        return null;
     }
 
     private function stripRepoFields(array $row) {
