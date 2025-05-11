@@ -88,7 +88,7 @@ Query parameters:
 
 ---
 
-`GET /api-dev/repo/stats?repo_url=https://github.com/vercel/next.js&time_window=7d`
+`GET /api-dev/repo/stats?repo_url=github.com/vercel/next.js&time_window=7d`
 
 Get stats snapshot for a repository.
 
