@@ -157,18 +157,32 @@ class RepoService extends BaseService {
     }
 
     public function getRepoReviewCount(string $owner, string $repo) {
-        $pulls = $this->githubClient->getPaginated("repos/$owner/$repo/pulls", [
-            'state' => 'all',
-        ]);
-
+        $since = strtotime('-1 day');
         $totalReviews = 0;
-        foreach ($pulls as $pr) {
-            if (!isset($pr['number'])) continue;
+        $page = 1;
 
-            $reviews = $this->githubClient->get("repos/$owner/$repo/pulls/{$pr['number']}/reviews");
-            if (is_array($reviews)) {
-                $totalReviews += count($reviews);
+        while (true) {
+            $pulls = $this->githubClient->get("repos/$owner/$repo/pulls", [
+                'state' => 'all',
+                'sort' => 'updated',
+                'direction' => 'desc',
+                'per_page' => 100,
+                'page' => $page
+            ]);
+
+            if (empty($pulls)) break;
+
+            foreach ($pulls as $pr) {
+                if (!isset($pr['number']) || !isset($pr['updated_at'])) continue;
+                if (strtotime($pr['updated_at']) < $since) break 2;
+
+                $reviews = $this->githubClient->get("repos/$owner/$repo/pulls/{$pr['number']}/reviews");
+
+                if (is_array($reviews)) {
+                    $totalReviews += count($reviews);
+                }
             }
+            $page++;
         }
         return $totalReviews;
     }

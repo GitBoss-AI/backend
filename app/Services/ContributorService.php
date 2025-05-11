@@ -252,37 +252,51 @@ class ContributorService extends BaseService {
     }
 
     public function getContributorCommitCount(string $username, string $owner, string $repo) {
+        $since = date('c', strtotime('-1 day'));
         $commits = $this->githubClient->getPaginated("repos/$owner/$repo/commits", [
             'author' => $username,
+            'since' => $since
         ]);
         return count($commits);
     }
 
     public function getContributorPrCount(string $username, string $owner, string $repo) {
-        $query = "repo:$owner/$repo type:pr author:$username";
+        $since = date('Y-m-d', strtotime('-1 day'));
+        $query = "repo:$owner/$repo type:pr author:$username created:>=$since";
 
         $result = $this->githubClient->get("search/issues", ['q' => $query]);
         return $result['total_count'];
     }
 
     public function getContributorReviewCount(string $username, string $owner, string $repo) {
+        $since = strtotime('-1 day');
         $totalReviews = 0;
+        $page = 1;
 
-        $pulls = $this->githubClient->getPaginated("repos/$owner/$repo/pulls", [
-            'state' => 'all'
-        ]);
+        while (true) {
+            $pulls = $this->githubClient->get("repos/$owner/$repo/pulls", [
+                'state' => 'all',
+                'sort' => 'updated',
+                'direction' => 'desc',
+                'per_page' => 100,
+                'page' => $page
+            ]);
 
-        foreach ($pulls as $pr) {
-            $prNumber = $pr['number'] ?? null;
-            if (!$prNumber) continue;
+            if (empty($pulls)) break;
 
-            $reviews = $this->githubClient->get("repos/$owner/$repo/pulls/$prNumber/reviews");
+            foreach ($pulls as $pr) {
+                if (!isset($pr['number']) || !isset($pr['updated_at'])) continue;
+                if (strtotime($pr['updated_at']) < $since) break 2;
 
-            foreach ($reviews as $review) {
-                if (($review['user']['login'] ?? '') === $username) {
-                    $totalReviews++;
+                $reviews = $this->githubClient->get("repos/$owner/$repo/pulls/{$pr['number']}/reviews");
+
+                foreach ($reviews as $review) {
+                    if (($review['user']['login'] ?? '') === $username) {
+                        $totalReviews++;
+                    }
                 }
             }
+            $page++;
         }
         return $totalReviews;
     }

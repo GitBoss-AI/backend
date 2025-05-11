@@ -24,14 +24,19 @@ class GithubClient {
     }
 
     public function get(string $endpoint, array $query = []): array {
-        $query['since'] = date('c', strtotime('-7 days'));
+        if (!isset($query['since']) && str_contains($endpoint, '/commits')) {
+            $query['since'] = date('c', strtotime('-1 day'));
+        }
         return $this->request('GET', $endpoint, ['query' => $query]);
     }
 
     public function getPaginated(string $endpoint, array $query = []): array {
         $results = [];
         $page = 1;
-        $query['since'] = date('c', strtotime('-7 days'));
+
+        if (!isset($query['since']) && str_contains($endpoint, '/commits')) {
+            $query['since'] = date('c', strtotime('-1 day'));
+        }
 
         do {
             $query['page'] = $page;
@@ -46,6 +51,7 @@ class GithubClient {
 
             $page++;
         } while ($hasNextPage);
+
         return $results;
     }
 
