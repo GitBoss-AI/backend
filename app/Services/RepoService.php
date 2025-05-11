@@ -62,7 +62,7 @@ class RepoService {
 
         // Fetch stats from github api and create stats snapshot
         $repoStatsData = [
-            'repo_id' => $newRepoId,
+            'repo_id' => $newRepoId['id'],
             'snapshot_date' => date('Y-m-d H:i:s'),
             'commits' => $this->getCommitCount($repoOwner, $repoName),
             'open_prs' => $this->getOpenPrCount($repoOwner, $repoName),

@@ -63,17 +63,11 @@ class UserController {
             $this->userService->createUser($input['username'], $owners, $input['password']);
             echo json_encode(['message' => 'User created']);
         } catch (\Exception $e) {
-            $msg = $e->getMessage();
-            if (str_contains($msg, 'username')) {
-                http_response_code(409);
-                echo json_encode(['error' => 'Username already exists']);
-            } elseif (stripos($msg, 'github owner') !== false) {
-                http_response_code(409);
-                echo json_encode(['error' => $msg]);
-            } else {
-                http_response_code(500);
-                echo json_encode(['error' => 'Database error', 'details' => $msg]);
-            }
+            http_response_code(500);
+            echo json_encode([
+                'error' => 'Server error',
+                'details' => $e->getMessage()]
+            );
         }
     }
 }
