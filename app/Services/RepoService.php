@@ -68,7 +68,7 @@ class RepoService {
             'open_issues' => $this->getOpenIssueCount($repoOwner, $repoName),
             'reviews' => $this->getReviewCount($repoOwner, $repoName)
         ];
-        $this->db->insert('repo_stats_snapshot', $repoStatsData);
+        $this->db->insert('repo_stats', $repoStatsData);
     }
 
     public function getAll(int $user_id) {
@@ -93,7 +93,7 @@ class RepoService {
 
         $repoId = $repo['id'];
         $latest = $this->db->selectOne(
-            "SELECT * FROM repo_stats_snapshot
+            "SELECT * FROM repo_stats
              WHERE repo_id = :repo_id
              ORDER BY snapshot_date DESC
              LIMIT 1",
@@ -121,7 +121,7 @@ class RepoService {
         }
 
         $earlier = $this->db->selectOne(
-            "SELECT * FROM repo_stats_snapshot
+            "SELECT * FROM repo_stats
             WHERE repo_id = :repo_id AND snapshot_date <= :start_date
             ORDER BY snapshot_date DESC
             LIMIT 1",
@@ -139,8 +139,8 @@ class RepoService {
             'stats' => [
                 'commits'    => $latest['commits']    - $earlier['commits'],
                 'open_prs'   => $latest['open_prs']   - $earlier['open_prs'],
-                'closed_prs' => $latest['closed_prs'] - $earlier['closed_prs'],
-                'issues'     => $latest['issues']     - $earlier['issues'],
+                'merged_prs' => $latest['merged_prs'] - $earlier['merged_prs'],
+                'open_issues'     => $latest['open_issues']     - $earlier['open_issues'],
                 'reviews'    => $latest['reviews']    - $earlier['reviews'],
             ]
         ];

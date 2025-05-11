@@ -48,7 +48,7 @@ CREATE TABLE repo_has_contributor (
     UNIQUE (repo_id, contributor_id)
 );
 
-CREATE TABLE repo_stats_snapshot (
+CREATE TABLE repo_stats (
     id SERIAL PRIMARY KEY,
     repo_id INTEGER REFERENCES repos(id) ON DELETE CASCADE,
     snapshot_date DATE NOT NULL,
@@ -71,6 +71,6 @@ CREATE TABLE contributor_stats_snapshot (
     UNIQUE (contributor_id, repo_id, snapshot_date)
 );
 
-CREATE INDEX idx_repo_snapshot_date ON repo_stats_snapshot(repo_id, snapshot_date);
+CREATE INDEX idx_repo_snapshot_date ON repo_stats(repo_id, snapshot_date);
 CREATE INDEX idx_contributor_snapshot_date ON contributor_stats_snapshot(repo_id, contributor_id, snapshot_date);
 CREATE INDEX idx_repo_has_contributor ON repo_has_contributor(repo_id, contributor_id);
