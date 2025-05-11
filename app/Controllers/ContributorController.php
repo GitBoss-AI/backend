@@ -16,8 +16,8 @@ class ContributorController
 
         $githubUsername = $_GET["github_username"] ?? null;
         $timeWindow = $_GET["time_window"] ?? null;
-        $repoId = (int) $_GET["repo_id"] ?? null;
-        $userId = (int) $_GET["user_id"] ?? null;
+        $repoId = isset($_GET["repo_id"]) ? (int) $_GET["repo_id"] : null;
+        $userId = isset($_GET["user_id"]) ? (int) $_GET["user_id"] : null;
 
         if (!$githubUsername) {
             http_response_code(400);
