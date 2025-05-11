@@ -15,11 +15,13 @@ $php = trim(shell_exec('which php'));
 $projectRoot = realpath(__DIR__ . '/../../');
 
 // Define worker paths
-$repoWorker = "$php $projectRoot/app/Cronjob/RepoStatsWorker.php >> /var/log/gitboss/gitboss-repoworker.log 2>&1";
-$contribWorker = "$php $projectRoot/app/Cronjob/ContributorStatsWorker.php >> /var/log/gitboss/gitboss-contribworker.log 2>&1";
+$repoWorker = "$php $projectRoot/app/Cronjob/RepoStatsWorker.php >> /var/log/gitboss/repoworker.log 2>&1";
+$contribWorker = "$php $projectRoot/app/Cronjob/ContributorStatsWorker.php >> /var/log/gitboss/contribworker.log 2>&1";
+$activityWorker = "$php $projectRoot/app/Cronjob/ContributorActivityWorker.php >> /var/log/gitboss/activityworker.log 2>&1";
 
 // Register them
 $cron = new CronManager();
 $cron->addJob('0 1 * * *', $repoWorker);        // sync at 01:00
 $cron->addJob('0 1 * * *', $contribWorker);     // sync at 01:00
+$cron->addJob('10 1 * * *', $activityWorker);   // sync at 01:10 -> after contributions are calculated
 $cron->install();
