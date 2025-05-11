@@ -42,7 +42,12 @@ class UserService {
             }
 
             // Insert ownerships
-            $this->db->insert('github_ownerships', $owners);
+            foreach ($owners as $owner) {
+                $this->db->insert('github_ownerships', [
+                    'user_id' => $userId,
+                    'owner' => $owner,
+                ]);
+            }
         } catch (\Exception $e) {
             throw $e;
         }
