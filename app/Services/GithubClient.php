@@ -24,12 +24,14 @@ class GithubClient {
     }
 
     public function get(string $endpoint, array $query = []): array {
+        $query['since'] = date('c', strtotime('-7 days'));
         return $this->request('GET', $endpoint, ['query' => $query]);
     }
 
     public function getPaginated(string $endpoint, array $query = []): array {
         $results = [];
         $page = 1;
+        $query['since'] = date('c', strtotime('-7 days'));
 
         do {
             $query['page'] = $page;
