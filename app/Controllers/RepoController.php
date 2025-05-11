@@ -61,7 +61,7 @@ class RepoController {
         header('Content-Type: application/json');
 
         $input = json_decode(file_get_contents("php://input"), true);
-        if (!$input || !isset($input['url'])) {
+        if (!$input || !isset($input['repo_url'])) {
             http_response_code(400);
             echo json_encode(['error' => 'Missing fields']);
             return;
