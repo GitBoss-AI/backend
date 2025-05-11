@@ -33,6 +33,12 @@ CREATE TABLE repos (
         ON DELETE CASCADE
 );
 
+CREATE TABLE contributors (
+    id SERIAL PRIMARY KEY,
+    github_username TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE repo_has_contributor (
     id SERIAL PRIMARY KEY,
     repo_id INTEGER REFERENCES repos(id) ON DELETE CASCADE,
@@ -52,12 +58,6 @@ CREATE TABLE repo_stats (
     open_issues INTEGER DEFAULT 0,
     reviews INTEGER DEFAULT 0,
     UNIQUE (repo_id, snapshot_date)
-);
-
-CREATE TABLE contributors (
-    id SERIAL PRIMARY KEY,
-    github_username TEXT NOT NULL UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE contributor_stats (
