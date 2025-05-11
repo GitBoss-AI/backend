@@ -33,12 +33,6 @@ CREATE TABLE repos (
         ON DELETE CASCADE
 );
 
-CREATE TABLE contributors (
-    id SERIAL PRIMARY KEY,
-    github_username TEXT NOT NULL UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE repo_has_contributor (
     id SERIAL PRIMARY KEY,
     repo_id INTEGER REFERENCES repos(id) ON DELETE CASCADE,
@@ -60,6 +54,12 @@ CREATE TABLE repo_stats (
     UNIQUE (repo_id, snapshot_date)
 );
 
+CREATE TABLE contributors (
+    id SERIAL PRIMARY KEY,
+    github_username TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE contributor_stats (
     id SERIAL PRIMARY KEY,
     contributor_id INTEGER REFERENCES contributors(id) ON DELETE CASCADE,
@@ -71,6 +71,15 @@ CREATE TABLE contributor_stats (
     UNIQUE (contributor_id, repo_id, snapshot_date)
 );
 
+CREATE TABLE contributor_activity_events (
+    id SERIAL PRIMARY KEY,
+    contributor_id INTEGER REFERENCES contributors(id) ON DELETE CASCADE,
+    repo_id INTEGER REFERENCES repos(id) ON DELETE CASCADE,
+    event_type TEXT CHECK (event_type IN ('commit', 'pr', 'review')),
+    quantity INTEGER NOT NULL,
+    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX idx_repo_snapshot_date ON repo_stats(repo_id, snapshot_date);
-CREATE INDEX idx_contributor_snapshot_date ON contributor_stats_snapshot(repo_id, contributor_id, snapshot_date);
+CREATE INDEX idx_contributor_snapshot_date ON contributor_stats(repo_id, contributor_id, snapshot_date);
 CREATE INDEX idx_repo_has_contributor ON repo_has_contributor(repo_id, contributor_id);

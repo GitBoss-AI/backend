@@ -64,4 +64,27 @@ class ContributorController
             echo json_encode(['error' => $e->getMessage()]);
         }
     }
+
+    public function getRecentActivity() {
+        header('Content-Type: application/json');
+
+        $repoId = $_GET['repo_id'] ?? null;
+
+        if (!$repoId) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing repo_id']);
+            return;
+        }
+
+        try {
+            $data = $this->contributorService->getRecentEvents((int) $repoId);
+            echo json_encode([
+                'message' => 'Recent activity retrieved successfully.',
+                'events' => $data
+            ]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
 }

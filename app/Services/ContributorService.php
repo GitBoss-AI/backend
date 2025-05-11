@@ -228,6 +228,25 @@ class ContributorService extends BaseService {
         ];
     }
 
+    public function getRecentEvents(int $repoId) {
+        $events = $this->db->selectAll(
+            "SELECT cae.*, c.github_username
+             FROM contributor_activity_events cae
+             JOIN contributors c ON cae.contributor_id = c.id
+             WHERE cae.repo_id = :repo_id
+             AND cae.occurred_at >= CURRENT_DATE
+             ORDER BY cae.quantity DESC, cae.occurred_at DESC
+             LIMIT 10",
+            ['repo_id' => $repoId]
+        );
+
+        foreach ($events as $i => &$event) {
+            $event['highlight'] = $i < 3;
+        }
+
+        return $events;
+    }
+
     public function getContributors(string $owner, string $repo) {
         return $this->githubClient->getPaginated("repos/$owner/$repo/contributors");
     }
