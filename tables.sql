@@ -54,8 +54,8 @@ CREATE TABLE repo_stats_snapshot (
     snapshot_date DATE NOT NULL,
     commits INTEGER DEFAULT 0,
     open_prs INTEGER DEFAULT 0,
-    closed_prs INTEGER DEFAULT 0,
-    issues INTEGER DEFAULT 0,
+    merged_prs INTEGER DEFAULT 0,
+    open_issues INTEGER DEFAULT 0,
     reviews INTEGER DEFAULT 0,
     UNIQUE (repo_id, snapshot_date)
 );

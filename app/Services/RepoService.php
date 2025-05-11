@@ -9,10 +9,12 @@ use PDOException;
 class RepoService {
     private $db;
     private $githubService;
+    private $githubClient;
 
     public function __construct() {
         $this->db = DB::getInstance();
         $this->githubService = new GithubService();
+        $this->githubClient = new GithubClient();
     }
 
     public function add(int $user_id, string $repo_url) {
@@ -35,6 +37,7 @@ class RepoService {
             }
         }
 
+        // Insert repo to database
         $parsedUrl = $this->githubService->parseGithubUrl($repo_url);
         $repoOwner = $parsedUrl['owner'];
         $repoName = $parsedUrl['name'];
@@ -54,6 +57,18 @@ class RepoService {
             'created_at' => date('Y-m-d H:i:s')
         ];
         $this->db->insert('repos', $repoData);
+
+        // Fetch stats from github api and create stats snapshot
+        $repoStatsData = [
+            'repo_id' => $repo['id'],
+            'snapshot_date' => date('Y-m-d H:i:s'),
+            'commits' => $this->getCommitCount($repoOwner, $repoName),
+            'open_prs' => $this->getOpenPrCount($repoOwner, $repoName),
+            'merged_prs' => $this->getMergedPrCount($repoOwner, $repoName),
+            'open_issues' => $this->getOpenIssueCount($repoOwner, $repoName),
+            'reviews' => $this->getReviewCount($repoOwner, $repoName)
+        ];
+        $this->db->insert('repo_stats_snapshot', $repoStatsData);
     }
 
     public function getAll(int $user_id) {
@@ -129,6 +144,50 @@ class RepoService {
                 'reviews'    => $latest['reviews']    - $earlier['reviews'],
             ]
         ];
+    }
+
+    public function getCommitCount(string $owner, string $repo) {
+        $commits = $this->githubClient->getPaginated("/repos/$owner/$repo/commits");
+
+        return count($commits);
+    }
+
+    public function getOpenPrCount(string $owner, string $repo) {
+        $query = "repo:$owner/$repo type:pr state:open";
+        return $this->getSearchCount($query);
+    }
+
+    public function getMergedPrCount(string $owner, string $repo) {
+        $query = "repo:$owner/$repo type:pr is:merged";
+        return $this->getSearchCount($query);
+    }
+
+    public function getOpenIssueCount(string $owner, string $repo) {
+        $query = "repo:$owner/$repo type:issue state:open";
+        return $this->getSearchCount($query);
+    }
+
+    public function getReviewCount(string $owner, string $repo) {
+        $pulls = $this->githubClient->getPaginated("repos/$owner/$repo/pulls", [
+            'state' => 'all',
+        ]);
+
+        $totalReviews = 0;
+        foreach ($pulls as $pr) {
+            if (!isset($pr['number'])) continue;
+
+            $reviews = $this->githubClient->get("repos/$owner/$repo/pulls/{$pr['number']}/reviews");
+            if (is_array($reviews)) {
+                $totalReviews += count($reviews);
+            }
+        }
+
+        return $totalReviews;
+    }
+
+    private function getSearchCount(string $q) {
+        $result = $this->githubClient->getPaginated("search/issues", ['q' => $q]);
+        return $result['total_count'];
     }
 
     private function stripRepoFields(array $row) {
