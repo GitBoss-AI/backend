@@ -44,7 +44,7 @@ class ContributorService extends BaseService {
                 'prs_opened' => $this->getContributorPrCount($username, $repoOwner, $repoName),
                 'reviews' => $this->getContributorReviewCount($username, $repoOwner, $repoName)
             ];
-            $this->db->insert('repo_stats', $contributorStatsData);
+            $this->db->insert('contributor_stats', $contributorStatsData);
         }
     }
 
