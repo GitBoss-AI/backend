@@ -81,5 +81,5 @@ CREATE TABLE contributor_activity_events (
 );
 
 CREATE INDEX idx_repo_snapshot_date ON repo_stats(repo_id, snapshot_date);
-CREATE INDEX idx_contributor_snapshot_date ON contributor_stats_snapshot(repo_id, contributor_id, snapshot_date);
+CREATE INDEX idx_contributor_snapshot_date ON contributor_stats(repo_id, contributor_id, snapshot_date);
 CREATE INDEX idx_repo_has_contributor ON repo_has_contributor(repo_id, contributor_id);
