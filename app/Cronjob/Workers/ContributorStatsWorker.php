@@ -69,4 +69,4 @@ foreach ($rows as $row) {
     }
 }
 
-echo "ContributorWorker complete.\n";
+echo "ContributorStatsWorker complete.\n";
