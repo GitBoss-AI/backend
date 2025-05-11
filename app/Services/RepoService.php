@@ -13,13 +13,13 @@ class RepoService {
 
     public function __construct() {
         $this->db = DB::getInstance();
-        $this->githubService = new GithubService();
+        $this->githubService = new GitHubService();
         $this->githubClient = new GithubClient();
     }
 
     public function add(int $user_id, string $repo_url) {
         $repo = $this->db->selectOne(
-            "SELECT id FROM repos WHERE url = :url",
+            "SELECT * FROM repos WHERE url = :url",
             ['url' => $repo_url]
         );
 
