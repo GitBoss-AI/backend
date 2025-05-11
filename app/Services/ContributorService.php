@@ -139,12 +139,17 @@ class ContributorService extends BaseService {
         ];
     }
 
-    public function topPerformers(int $repoId, string $timeWindow) {
-        try {
-            $startDate = $this->getStartDate($timeWindow);
-        } catch (\Exception $e) {
-            throw new \Exception("Invalid time_window: " . $e->getMessage());
+    public function topPerformers(int $repoId, ?string $timeWindow = null) {
+        $startDate = null;
+
+        if ($timeWindow) {
+            try {
+                $startDate = $this->getStartDate($timeWindow);
+            } catch (\Exception $e) {
+                throw new \Exception("Invalid time_window: " . $e->getMessage());
+            }
         }
+
 
         $contributors = $this->db->selectAll("
             SELECT c.id, c.github_username
@@ -182,12 +187,32 @@ class ContributorService extends BaseService {
 
             if (!$earlier) continue;
 
-            $allStats[] = [
-                'github_username'   => $username,
-                'commits'           => $latest['commits']       - $earlier['commits'],
-                'prs_opened'        => $latest['prs_opened']    - $earlier['prs_opened'],
-                'reviews'           => $latest['reviews']       - $earlier['reviews'],
+            $stats = [
+                'github_username' => $username,
             ];
+
+            if ($startDate) {
+                $earlier = $this->db->selectOne(
+                    "SELECT * FROM contributor_stats
+                 WHERE contributor_id = :cid AND repo_id = :rid AND snapshot_date <= :start
+                 ORDER BY snapshot_date DESC
+                 LIMIT 1",
+                    ['cid' => $cid, 'rid' => $repoId, 'start' => $startDate]
+                );
+
+                if (!$earlier) continue;
+
+                $stats['commits']    = $latest['commits']    - $earlier['commits'];
+                $stats['prs_opened'] = $latest['prs_opened'] - $earlier['prs_opened'];
+                $stats['reviews']    = $latest['reviews']    - $earlier['reviews'];
+            } else {
+                // All-time totals
+                $stats['commits']    = $latest['commits'];
+                $stats['prs_opened'] = $latest['prs_opened'];
+                $stats['reviews']    = $latest['reviews'];
+            }
+
+            $allStats[] = $stats;
         }
 
         $getTop = function($metric) use ($allStats) {
