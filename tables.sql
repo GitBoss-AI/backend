@@ -60,7 +60,7 @@ CREATE TABLE repo_stats (
     UNIQUE (repo_id, snapshot_date)
 );
 
-CREATE TABLE contributor_stats_snapshot (
+CREATE TABLE contributor_stats (
     id SERIAL PRIMARY KEY,
     contributor_id INTEGER REFERENCES contributors(id) ON DELETE CASCADE,
     repo_id INTEGER REFERENCES repos(id) ON DELETE CASCADE,
