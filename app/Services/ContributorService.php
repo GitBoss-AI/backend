@@ -139,6 +139,95 @@ class ContributorService extends BaseService {
         ];
     }
 
+    public function topPerformers(int $repoId, ?string $timeWindow = null) {
+        $startDate = null;
+
+        if ($timeWindow) {
+            try {
+                $startDate = $this->getStartDate($timeWindow);
+            } catch (\Exception $e) {
+                throw new \Exception("Invalid time_window: " . $e->getMessage());
+            }
+        }
+
+
+        $contributors = $this->db->selectAll("
+            SELECT c.id, c.github_username
+            FROM contributors c
+            JOIN repo_has_contributor rhc ON rhc.contributor_id = c.id
+            WHERE rhc.repo_id = :repo_id",
+            ['repo_id' => $repoId]
+        );
+
+        $allStats = [];
+
+        foreach ($contributors as $contributor) {
+            $cid = $contributor['id'];
+            $username = $contributor['github_username'];
+
+            // latest snapshot
+            $latest = $this->db->selectOne(
+                "SELECT * FROM contributor_stats
+             WHERE contributor_id = :cid AND repo_id = :rid
+             ORDER BY snapshot_date DESC
+             LIMIT 1",
+                ['cid' => $cid, 'rid' => $repoId]
+            );
+
+            if (!$latest) continue;
+
+            // earlier snapshot
+            $earlier = $this->db->selectOne(
+                "SELECT * FROM contributor_stats
+             WHERE contributor_id = :cid AND repo_id = :rid AND snapshot_date <= :start
+             ORDER BY snapshot_date DESC
+             LIMIT 1",
+                ['cid' => $cid, 'rid' => $repoId, 'start' => $startDate]
+            );
+
+            if (!$earlier) continue;
+
+            $stats = [
+                'github_username' => $username,
+            ];
+
+            if ($startDate) {
+                $earlier = $this->db->selectOne(
+                    "SELECT * FROM contributor_stats
+                 WHERE contributor_id = :cid AND repo_id = :rid AND snapshot_date <= :start
+                 ORDER BY snapshot_date DESC
+                 LIMIT 1",
+                    ['cid' => $cid, 'rid' => $repoId, 'start' => $startDate]
+                );
+
+                if (!$earlier) continue;
+
+                $stats['commits']    = $latest['commits']    - $earlier['commits'];
+                $stats['prs_opened'] = $latest['prs_opened'] - $earlier['prs_opened'];
+                $stats['reviews']    = $latest['reviews']    - $earlier['reviews'];
+            } else {
+                // All-time totals
+                $stats['commits']    = $latest['commits'];
+                $stats['prs_opened'] = $latest['prs_opened'];
+                $stats['reviews']    = $latest['reviews'];
+            }
+
+            $allStats[] = $stats;
+        }
+
+        $getTop = function($metric) use ($allStats) {
+            $sorted = $allStats;
+            usort($sorted, fn($a, $b) => $b[$metric] <=> $a[$metric]);
+            return array_slice($sorted, 0, 10);
+        };
+
+        return [
+            'top_committers' => $getTop('commits'),
+            'top_prs'        => $getTop('prs_opened'),
+            'top_reviewers'  => $getTop('reviews'),
+        ];
+    }
+
     public function getContributors(string $owner, string $repo) {
         return $this->githubClient->getPaginated("repos/$owner/$repo/contributors");
     }

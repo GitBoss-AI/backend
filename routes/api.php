@@ -25,6 +25,7 @@ $routes = [
 
         // Contributor
         '/api-dev/contributor/stats' => [ContributorController::class, 'getContributorStats'],
+        '/api-dev/contributor/topPerformers' => [ContributorController::class, 'getTopPerformers'],
 
         // Team activity
         //'/api-dev/team-activity/timeline' => [TeamActivityController::class, 'getTimeline'],

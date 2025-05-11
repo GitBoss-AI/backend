@@ -42,4 +42,26 @@ class ContributorController
             echo json_encode(['error' => $e->getMessage()]);
         }
     }
+
+    public function getTopPerformers() {
+        header('Content-Type: application/json');
+
+        $timeWindow = $_GET["time_window"] ?? null;
+        $repoId = isset($_GET["repo_id"]) ? (int) $_GET["repo_id"] : null;
+
+        if (!$repoId) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing repo_id']);
+            return;
+        }
+
+        try {
+            $data = $this->contributorService->topPerformers($repoId, $timeWindow);
+            http_response_code(200);
+            echo json_encode($data);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
 }
