@@ -1,18 +1,7 @@
 <?php
 namespace App\Services;
 
-use App\Database\DB;
-use DateTime;
-
-class RepoService {
-    private $db;
-    private $githubClient;
-
-    public function __construct() {
-        $this->db = DB::getInstance();
-        $this->githubClient = new GithubClient();
-    }
-
+class RepoService extends BaseService {
     public function add(int $user_id, string $repo_url) {
         $repo = $this->db->selectOne(
             "SELECT * FROM repos WHERE url = :url",
@@ -54,19 +43,22 @@ class RepoService {
         ];
         $this->db->insert('repos', $repoData);
 
-        $newRepoId = $this->db->selectOne("SELECT id FROM repos ORDER BY id DESC LIMIT 1");
+        $result = $this->db->selectOne("SELECT id FROM repos ORDER BY id DESC LIMIT 1");
+        $newRepoId = $result['id'];
 
         // Fetch stats from github api and create stats snapshot
         $repoStatsData = [
-            'repo_id' => $newRepoId['id'],
+            'repo_id' => $newRepoId,
             'snapshot_date' => date('Y-m-d H:i:s'),
-            'commits' => $this->getCommitCount($repoOwner, $repoName),
-            'open_prs' => $this->getOpenPrCount($repoOwner, $repoName),
-            'merged_prs' => $this->getMergedPrCount($repoOwner, $repoName),
-            'open_issues' => $this->getOpenIssueCount($repoOwner, $repoName),
-            'reviews' => $this->getReviewCount($repoOwner, $repoName)
+            'commits' => $this->getRepoCommitCount($repoOwner, $repoName),
+            'open_prs' => $this->getRepoOpenPrCount($repoOwner, $repoName),
+            'merged_prs' => $this->getRepoMergedPrCount($repoOwner, $repoName),
+            'open_issues' => $this->getRepoOpenIssueCount($repoOwner, $repoName),
+            'reviews' => $this->getRepoReviewCount($repoOwner, $repoName)
         ];
         $this->db->insert('repo_stats', $repoStatsData);
+
+        return $newRepoId;
     }
 
     public function getAll(int $user_id) {
@@ -144,28 +136,27 @@ class RepoService {
         ];
     }
 
-    public function getCommitCount(string $owner, string $repo) {
+    public function getRepoCommitCount(string $owner, string $repo) {
         $commits = $this->githubClient->getPaginated("/repos/$owner/$repo/commits");
-
         return count($commits);
     }
 
-    public function getOpenPrCount(string $owner, string $repo) {
+    public function getRepoOpenPrCount(string $owner, string $repo) {
         $query = "repo:$owner/$repo type:pr state:open";
         return $this->getSearchCount($query);
     }
 
-    public function getMergedPrCount(string $owner, string $repo) {
+    public function getRepoMergedPrCount(string $owner, string $repo) {
         $query = "repo:$owner/$repo type:pr is:merged";
         return $this->getSearchCount($query);
     }
 
-    public function getOpenIssueCount(string $owner, string $repo) {
+    public function getRepoOpenIssueCount(string $owner, string $repo) {
         $query = "repo:$owner/$repo type:issue state:open";
         return $this->getSearchCount($query);
     }
 
-    public function getReviewCount(string $owner, string $repo) {
+    public function getRepoReviewCount(string $owner, string $repo) {
         $pulls = $this->githubClient->getPaginated("repos/$owner/$repo/pulls", [
             'state' => 'all',
         ]);
@@ -179,44 +170,6 @@ class RepoService {
                 $totalReviews += count($reviews);
             }
         }
-
         return $totalReviews;
-    }
-
-    private function getSearchCount(string $q) {
-        $result = $this->githubClient->get("search/issues", ['q' => $q]);
-        return $result['total_count'];
-    }
-
-    private function parseGithubUrl(string $url) {
-        if (preg_match('#github\.com/([^/]+)/([^/]+)#', $url, $matches)) {
-            return [
-                'owner' => $matches[1],
-                'name'  => $matches[2]
-            ];
-        }
-        return null;
-    }
-
-    private function stripRepoFields(array $row) {
-        unset($row['id'], $row['repo_id'], $row['snapshot_date']);
-        return $row;
-    }
-
-    private function getStartDate(string $timeWindow): string {
-        $patterns = [
-            '/^(\d+)d$/' => fn($m) => "{$m[1]} days",
-            '/^(\d+)w$/' => fn($m) => (7 * (int)$m[1]) . " days",
-            '/^(\d+)m$/' => fn($m) => "{$m[1]} months",
-        ];
-
-        foreach ($patterns as $pattern => $handler) {
-            if (preg_match($pattern, $timeWindow, $m)) {
-                $interval = $handler($m);
-                return (new DateTime())->modify("-$interval")->format('Y-m-d');
-            }
-        }
-
-        throw new \Exception("Invalid time_window format. Use Nd, Nw, or Nm.");
     }
 }

@@ -2,7 +2,6 @@
 namespace App\Services;
 
 use App\Database\DB;
-use PDO;
 
 class UserService {
 	
@@ -62,4 +61,3 @@ class UserService {
         return password_verify($password, $hash);
     }
 }
-

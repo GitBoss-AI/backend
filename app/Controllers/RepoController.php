@@ -1,14 +1,18 @@
 <?php
 namespace App\Controllers;
 
+use App\Services\ContributorService;
 use App\Services\RepoService;
 
 class RepoController {
     private $repoService;
+    private $contributorService;
 
     public function __construct() {
         $this->repoService = new RepoService();
+        $this->contributorService = new ContributorService();
     }
+
     public function addRepo() {
         header('Content-Type: application/json');
 
@@ -23,7 +27,9 @@ class RepoController {
         $user_id = (int) $input['user_id'];
 
         try {
-            $this->repoService->add($user_id, $repo_url);
+            // Add repo & contributors
+            $repo_id = $this->repoService->add($user_id, $repo_url);
+            $this->contributorService->add($repo_id, $repo_url);
             http_response_code(200);
             echo json_encode(['message' => 'Repository successfully added.']);
         } catch (\Exception $e) {
@@ -74,7 +80,7 @@ class RepoController {
                 'repoStats' => $repoStats
             ]);
         } catch (\Exception $e) {
-            http_response_code(400);
+            http_response_code(500);
             echo json_encode(['error' => $e->getMessage()]);
         }
     }

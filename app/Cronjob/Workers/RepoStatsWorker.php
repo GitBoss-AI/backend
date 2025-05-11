@@ -1,5 +1,4 @@
 <?php
-
 require_once __DIR__ . '/../../../vendor/autoload.php';
 
 use App\Services\RepoService;
@@ -23,11 +22,11 @@ foreach ($repos as $repo) {
         $stats = [
             'repo_id' => $repoId,
             'snapshot_date' => date('Y-m-d'),
-            'commits'       => $repoService->getCommitCount($owner, $name),
-            'open_prs'      => $repoService->getOpenPrCount($owner, $name),
-            'merged_prs'    => $repoService->getMergedPrCount($owner, $name),
-            'open_issues'   => $repoService->getOpenIssueCount($owner, $name),
-            'reviews'       => $repoService->getReviewCount($owner, $name)
+            'commits'       => $repoService->getRepoCommitCount($owner, $name),
+            'open_prs'      => $repoService->getRepoOpenPrCount($owner, $name),
+            'merged_prs'    => $repoService->getRepoMergedPrCount($owner, $name),
+            'open_issues'   => $repoService->getRepoOpenIssueCount($owner, $name),
+            'reviews'       => $repoService->getRepoReviewCount($owner, $name)
         ];
 
         $db->insert('repo_stats', $stats);

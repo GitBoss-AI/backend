@@ -2,8 +2,7 @@
 use App\Controllers\HealthController;
 use App\Controllers\UserController;
 use App\Controllers\RepoController;
-use App\Controllers\RepositoryStatsController;
-use App\Controllers\TeamActivityController;
+use App\Controllers\ContributorController;
 use App\Controllers\RecentActivityController;
 
 // Simple dispatcher
@@ -23,6 +22,9 @@ $routes = [
         // Repo
         '/api-dev/repo/getAll' => [RepoController::class, 'getAllRepos'],
         '/api-dev/repo/stats' => [RepoController::class, 'getRepoStats'],
+
+        // Contributor
+        '/api-dev/contributor/stats' => [ContributorController::class, 'getContributorStats'],
 
         // Team activity
         //'/api-dev/team-activity/timeline' => [TeamActivityController::class, 'getTimeline'],
@@ -48,4 +50,3 @@ if (isset($routes[$method][$uri])) {
     http_response_code(404);
     return json_encode(['error' => 'Not found']);
 }
-

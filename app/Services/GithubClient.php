@@ -44,7 +44,6 @@ class GithubClient {
 
             $page++;
         } while ($hasNextPage);
-
         return $results;
     }
 
@@ -64,7 +63,6 @@ class GithubClient {
             } else {
                 $msg = "GitHub API exception: " . $e->getMessage();
             }
-
             throw new \Exception($msg);
         }
     }
