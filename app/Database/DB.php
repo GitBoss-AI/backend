@@ -1,6 +1,7 @@
 <?php
 namespace App\Database;
 
+use Dotenv\Dotenv;
 use PDO;
 
 class DB {
@@ -8,6 +9,11 @@ class DB {
     private $pdo;
 
     private function __construct() {
+        if (!isset($_ENV['DB_HOST'])) {
+            $dotenv = Dotenv::createImmutable(__DIR__ . '/../../..');
+            $dotenv->load();
+        }
+        
         $host = $_ENV['DB_HOST'];
         $dbname = $_ENV['DB_NAME'];
         $user = $_ENV['DB_USER'];
