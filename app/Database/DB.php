@@ -9,8 +9,9 @@ class DB {
     private $pdo;
 
     private function __construct() {
+        $rootPath = '/var/www/gitboss-ai/backend-dev/';
         if (!isset($_ENV['DB_HOST'])) {
-            $dotenv = Dotenv::createImmutable(__DIR__ . '/../../..');
+            $dotenv = Dotenv::createImmutable($rootPath);
             $dotenv->load();
         }
         

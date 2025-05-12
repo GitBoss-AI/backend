@@ -1,28 +1,36 @@
 <?php
 namespace App\Services;
 
+use App\Logger\Logger;
+
 class RepoService extends BaseService {
+
+    private $logFile = 'reposervice';
+
     public function add(int $user_id, string $repo_url) {
+        Logger::info($this->logFile, "Attempting to add repo: $repo_url for user_id=$user_id");
+
         $repo = $this->db->selectOne(
             "SELECT * FROM repos WHERE url = :url",
             ['url' => $repo_url]
         );
 
         if ($repo) {
-            // Check if the existing repo is owned by the same user
+            Logger::info($this->logFile, "Repo $repo_url already exists.");
             $ownership = $this->db->selectOne(
                 "SELECT * FROM github_ownerships WHERE owner = :owner AND user_id = :user_id",
                 ['owner' => $repo['owner'], 'user_id' => $user_id]
             );
 
             if ($ownership) {
+                Logger::error($this->logFile, "User already owns this repo.");
                 throw new \Exception("This repository has already been added to the system.");
             } else {
+                Logger::error($this->logFile, "Repo is owned by another user.");
                 throw new \Exception("This repository is already tracked by another user.");
             }
         }
 
-        // Insert repo to database
         $parsedUrl = $this->parseGithubUrl($repo_url);
         $repoOwner = $parsedUrl['owner'];
         $repoName = $parsedUrl['name'];
@@ -31,22 +39,24 @@ class RepoService extends BaseService {
             "SELECT * FROM github_ownerships WHERE owner = :owner AND user_id = :user_id",
             ['owner' => $repoOwner, 'user_id' => $user_id]
         );
+
         if (!$ownership) {
+            Logger::error($this->logFile, "User $user_id is not authorized for owner $repoOwner.");
             throw new \Exception("You do not have permission to add repos for owner '$repoOwner'.");
         }
 
-        $repoData = [
+        $this->db->insert('repos', [
             'url' => $repo_url,
             'owner' => $repoOwner,
             'name' => $repoName,
             'created_at' => date('Y-m-d H:i:s')
-        ];
-        $this->db->insert('repos', $repoData);
+        ]);
 
         $result = $this->db->selectOne("SELECT id FROM repos ORDER BY id DESC LIMIT 1");
         $newRepoId = $result['id'];
 
-        // Fetch stats from github api and create stats snapshot
+        Logger::info($this->logFile, "Inserted repo [$repoName] with ID $newRepoId.");
+
         $repoStatsData = [
             'repo_id' => $newRepoId,
             'snapshot_date' => date('Y-m-d H:i:s'),
@@ -56,10 +66,14 @@ class RepoService extends BaseService {
             'open_issues' => $this->getRepoOpenIssueCount($repoOwner, $repoName),
             'reviews' => $this->getRepoReviewCount($repoOwner, $repoName)
         ];
+
         $this->db->insert('repo_stats', $repoStatsData);
+
+        Logger::info($this->logFile, "Created stats snapshot for repo $newRepoId");
 
         return $newRepoId;
     }
+
 
     public function getAll(int $user_id) {
         return $this->db->selectAll(
@@ -137,26 +151,38 @@ class RepoService extends BaseService {
     }
 
     public function getRepoCommitCount(string $owner, string $repo) {
+        Logger::info($this->logFile, "Fetching commits for $owner/$repo");
         $commits = $this->githubClient->getPaginated("/repos/$owner/$repo/commits");
+        Logger::info($this->logFile, "Commit count for $owner/$repo: " . count($commits));
         return count($commits);
     }
 
     public function getRepoOpenPrCount(string $owner, string $repo) {
+        Logger::info($this->logFile, "Fetching open PR count for $owner/$repo");
         $query = "repo:$owner/$repo type:pr state:open";
-        return $this->getSearchCount($query);
+        $count = $this->getSearchCount($query);
+        Logger::info($this->logFile, "Open PR count: $count");
+        return $count;
     }
 
     public function getRepoMergedPrCount(string $owner, string $repo) {
+        Logger::info($this->logFile, "Fetching merged PR count for $owner/$repo");
         $query = "repo:$owner/$repo type:pr is:merged";
-        return $this->getSearchCount($query);
+        $count = $this->getSearchCount($query);
+        Logger::info($this->logFile, "Merged PR count: $count");
+        return $count;
     }
 
     public function getRepoOpenIssueCount(string $owner, string $repo) {
+        Logger::info($this->logFile, "Fetching open issue count for $owner/$repo");
         $query = "repo:$owner/$repo type:issue state:open";
-        return $this->getSearchCount($query);
+        $count = $this->getSearchCount($query);
+        Logger::info($this->logFile, "Open issue count: $count");
+        return $count;
     }
 
     public function getRepoReviewCount(string $owner, string $repo) {
+        Logger::info($this->logFile, "Fetching review count for $owner/$repo (last 24h)");
         $since = strtotime('-1 day');
         $totalReviews = 0;
         $page = 1;
@@ -177,13 +203,14 @@ class RepoService extends BaseService {
                 if (strtotime($pr['updated_at']) < $since) break 2;
 
                 $reviews = $this->githubClient->get("repos/$owner/$repo/pulls/{$pr['number']}/reviews");
-
                 if (is_array($reviews)) {
                     $totalReviews += count($reviews);
                 }
             }
             $page++;
         }
+
+        Logger::info($this->logFile, "Total reviews in last 24h for $owner/$repo: $totalReviews");
         return $totalReviews;
     }
 }

@@ -1,18 +1,25 @@
 <?php
 namespace App\Services;
 
-use DateTime;
+use App\Logger\Logger;
 
 class TeamService extends BaseService {
+
+    private $logFile = 'teamservice';
+
     public function getTimeline(int $repoId, string $timeWindow, string $groupBy = 'month') {
+        Logger::info($this->logFile, "Generating timeline for repo_id=$repoId, window=$timeWindow, group_by=$groupBy");
+
         $validGroups = ['week', 'month', 'quarter'];
         if (!in_array($groupBy, $validGroups)) {
+            Logger::error($this->logFile, "Invalid group_by: $groupBy");
             throw new \Exception("Invalid group_by value.");
         }
 
         try {
             $startDate = $this->getStartDate($timeWindow);
         } catch (\Exception $e) {
+            Logger::error($this->logFile, "Invalid timeWindow: " . $e->getMessage());
             throw new \Exception("Invalid time_window: " . $e->getMessage());
         }
 
@@ -24,10 +31,12 @@ class TeamService extends BaseService {
             ['repo_id' => $repoId, 'start_date' => $startDate]
         );
 
+        Logger::info($this->logFile, "Fetched " . count($rows) . " rows from repo_stats");
+
         $buckets = [];
 
         foreach ($rows as $r) {
-            $date = new DateTime($r['snapshot_date']);
+            $date = new \DateTime($r['snapshot_date']);
 
             $key = match ($groupBy) {
                 'week'    => 'W' . $date->format('W'),
@@ -44,6 +53,7 @@ class TeamService extends BaseService {
             $buckets[$key]['reviews'] += $r['reviews'];
         }
 
+        Logger::info($this->logFile, "Timeline generation complete");
         return array_values($buckets);
     }
 }
