@@ -88,12 +88,12 @@ Query parameters:
 
 ---
 
-`GET /api-dev/repo/stats?repo_url=github.com/vercel/next.js&time_window=7d`
+`GET /api-dev/repo/stats?repo_id=github.com/vercel/next.js&time_window=7d`
 
 Get stats snapshot for a repository.
 
 Query parameters:
-- repo_url: full GitHub repo URL (must match what was added)
+- repo_id: numeric id of repo
 - time_window: optional — use formats like `7d`, `2w`, `1m`
 
 Example response:

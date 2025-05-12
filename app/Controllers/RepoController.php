@@ -64,16 +64,16 @@ class RepoController {
     public function getRepoStats() {
         header('Content-Type: application/json');
 
-        $repoUrl = $_GET['repo_url'] ?? null;
+        $repoId = $_GET['repo_id'] ?? null;
         $timeWindow = $_GET['time_window'] ?? null;
-        if (!$repoUrl) {
+        if (!$repoId) {
             http_response_code(400);
             echo json_encode(['error' => 'Missing repo_url']);
             return;
         }
 
         try {
-            $repoStats = $this->repoService->getStats($repoUrl, $timeWindow);
+            $repoStats = $this->repoService->getStats($repoId, $timeWindow);
             http_response_code(200);
             echo json_encode([
                 'message' => 'Repos stats successfully retrieved.',

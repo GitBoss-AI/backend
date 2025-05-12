@@ -76,17 +76,18 @@ class RepoService extends BaseService {
         );
     }
 
-    public function getStats(string $repo_url, ?string $timeWindow = null) {
+    public function getStats(int $repoId, ?string $timeWindow = null) {
+        // Ensure repo exists
         $repo = $this->db->selectOne(
-            "SELECT id FROM repos WHERE url = :url",
-            ['url' => $repo_url]
+            "SELECT id FROM repos WHERE id = :id",
+            ['id' => $repoId]
         );
 
         if (!$repo) {
             throw new \Exception("Repo not found.");
         }
 
-        $repoId = $repo['id'];
+        // Get the latest snapshot
         $latest = $this->db->selectOne(
             "SELECT * FROM repo_stats
              WHERE repo_id = :repo_id
@@ -96,11 +97,9 @@ class RepoService extends BaseService {
         );
 
         if (!$latest) {
-            // TODO: get stats from github api
             throw new \Exception("No snapshot data available.");
         }
 
-        // If no timeWindow is given just return the latest stats
         if (!$timeWindow) {
             return [
                 'date' => $latest['snapshot_date'],
@@ -108,7 +107,7 @@ class RepoService extends BaseService {
             ];
         }
 
-        // Compute the start date threshold
+        // Calculate time window
         try {
             $startDate = $this->getStartDate($timeWindow);
         } catch (\Exception $e) {
@@ -132,11 +131,11 @@ class RepoService extends BaseService {
             'from' => $earlier['snapshot_date'],
             'to' => $latest['snapshot_date'],
             'stats' => [
-                'commits'    => $latest['commits']    - $earlier['commits'],
-                'open_prs'   => $latest['open_prs']   - $earlier['open_prs'],
-                'merged_prs' => $latest['merged_prs'] - $earlier['merged_prs'],
-                'open_issues'     => $latest['open_issues']     - $earlier['open_issues'],
-                'reviews'    => $latest['reviews']    - $earlier['reviews'],
+                'commits'      => $latest['commits']      - $earlier['commits'],
+                'open_prs'     => $latest['open_prs']     - $earlier['open_prs'],
+                'merged_prs'   => $latest['merged_prs']   - $earlier['merged_prs'],
+                'open_issues'  => $latest['open_issues']  - $earlier['open_issues'],
+                'reviews'      => $latest['reviews']      - $earlier['reviews'],
             ]
         ];
     }
