@@ -84,4 +84,27 @@ class RepoController {
             echo json_encode(['error' => $e->getMessage()]);
         }
     }
+
+    public function getRepoContributors() {
+        header('Content-Type: application/json');
+
+        $repoId = $_GET['repo_id'];
+        if (!$repoId) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing repo_id']);
+            return;
+        }
+
+        try {
+            $repoContributors = $this->repoService->getContributors((int)$repoId);
+            http_response_code(200);
+            echo json_encode([
+                'message' => 'Contributors retrieved successfully',
+                'contributors' => $repoContributors
+            ]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
 }

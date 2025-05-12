@@ -22,6 +22,7 @@ $routes = [
         // Repo
         '/api-dev/repo/getAll' => [RepoController::class, 'getAllRepos'],
         '/api-dev/repo/stats' => [RepoController::class, 'getRepoStats'],
+        '/api-dev/repo/contributors' => [RepoController::class, 'getRepoContributors'],
 
         // Contributor
         '/api-dev/contributor/stats' => [ContributorController::class, 'getContributorStats'],

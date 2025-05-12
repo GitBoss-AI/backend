@@ -140,6 +140,26 @@ class RepoService extends BaseService {
         ];
     }
 
+    public function getContributors(string $repoId) {
+        Logger::info($this->logFile, "Fetching contributors for repo_id=$repoId");
+
+        $contributors = $this->db->selectAll(
+            "SELECT c.id, c.github_username
+             FROM contributors c
+             JOIN repo_has_contributor rhc ON rhc.contributor_id = c.id
+             WHERE rhc.repo_id = :repo_id",
+            ['repo_id' => $repoId]
+        );
+
+        if (!$contributors) {
+            Logger::info($this->logFile, "No contributors found for repo_id=$repoId");
+        } else {
+            Logger::info($this->logFile, "Found " . count($contributors) . " contributors for repo_id=$repoId");
+        }
+
+        return $contributors;
+    }
+
     public function getRepoCommitCount(string $owner, string $repo) {
         Logger::info($this->logFile, "Fetching commits for $owner/$repo");
         $commits = $this->githubClient->getPaginated("/repos/$owner/$repo/commits");
