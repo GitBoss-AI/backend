@@ -176,11 +176,11 @@ class RepoService extends BaseService {
         Logger::info($this->logFile, "Fetching review count for $owner/$repo (last 24h)");
         $since = strtotime('-1 day');
         $totalReviews = 0;
-        $page = 1;
+        $maxPages = 3;  // Set max pages to get data of last 24 hours
 
-        while (true) {
+        for ($page = 1; $page <= $maxPages; $page++) {
             $pulls = $this->githubClient->get("repos/$owner/$repo/pulls", [
-                'state' => 'all',
+                'state' => 'open',
                 'sort' => 'updated',
                 'direction' => 'desc',
                 'per_page' => 100,
@@ -194,11 +194,8 @@ class RepoService extends BaseService {
                 if (strtotime($pr['updated_at']) < $since) break 2;
 
                 $reviews = $this->githubClient->get("repos/$owner/$repo/pulls/{$pr['number']}/reviews");
-                if (is_array($reviews)) {
-                    $totalReviews += count($reviews);
-                }
+                $totalReviews += count($reviews);
             }
-            $page++;
         }
 
         Logger::info($this->logFile, "Total reviews in last 24h for $owner/$repo: $totalReviews");
