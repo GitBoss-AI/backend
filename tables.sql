@@ -1,8 +1,8 @@
--- Drop tables if they already exist (in dependency order)
-DROP TABLE IF EXISTS contributor_stats_snapshot CASCADE;
-DROP TABLE IF EXISTS repo_stats_snapshot CASCADE;
+DROP TABLE IF EXISTS contributor_stats CASCADE;
+DROP TABLE IF EXISTS repo_stats CASCADE;
+DROP TABLE IF EXISTS contributor_activity_events CASCADE;
 DROP TABLE IF EXISTS repo_has_contributor CASCADE;
-DROP TABLE IF EXISTS user_has_repo CASCADE;
+DROP TABLE IF EXISTS github_ownerships CASCADE;
 DROP TABLE IF EXISTS contributors CASCADE;
 DROP TABLE IF EXISTS repos CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
@@ -43,15 +43,15 @@ CREATE TABLE repo_has_contributor (
     id SERIAL PRIMARY KEY,
     repo_id INTEGER REFERENCES repos(id) ON DELETE CASCADE,
     contributor_id INTEGER REFERENCES contributors(id) ON DELETE CASCADE,
-    first_seen DATE,
-    last_seen DATE,
+    first_seen TIMESTAMP,
+    last_seen TIMESTAMP,
     UNIQUE (repo_id, contributor_id)
 );
 
 CREATE TABLE repo_stats (
     id SERIAL PRIMARY KEY,
     repo_id INTEGER REFERENCES repos(id) ON DELETE CASCADE,
-    snapshot_date DATE NOT NULL,
+    snapshot_date TIMESTAMP NOT NULL,
     commits INTEGER DEFAULT 0,
     open_prs INTEGER DEFAULT 0,
     merged_prs INTEGER DEFAULT 0,
@@ -64,7 +64,7 @@ CREATE TABLE contributor_stats (
     id SERIAL PRIMARY KEY,
     contributor_id INTEGER REFERENCES contributors(id) ON DELETE CASCADE,
     repo_id INTEGER REFERENCES repos(id) ON DELETE CASCADE,
-    snapshot_date DATE NOT NULL,
+    snapshot_date TIMESTAMP NOT NULL,
     commits INTEGER DEFAULT 0,
     prs_opened INTEGER DEFAULT 0,
     reviews INTEGER DEFAULT 0,
