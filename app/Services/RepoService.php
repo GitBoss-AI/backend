@@ -14,17 +14,16 @@ class RepoService extends BaseService {
 
         Logger::info($this->logFile, "Attempting to add repo: $repo_url for user_id=$user_id");
 
-        // Check for duplicate repos
-        $this->assertRepoNotAlreadyTracked($repo_url, $user_id);
-        // Check that user is authorized to add repos for this owner
-        $this->assertUserOwnsGithubOwner($user_id, $repoOwner);
-
         try {
             $this->assertRepoNotAlreadyTracked($repo_url, $user_id);
             $this->assertUserOwnsGithubOwner($user_id, $repoOwner);
         } catch (\Exception $e) {
             Logger::error($this->logFile, "Validation failed: " . $e->getMessage());
             throw $e; // or return null / false / custom error response
+        }
+
+        if (!$this->isPublicRepo($repoOwner, $repoName)) {
+            throw new \Exception("The repository $repoOwner/$repoName does not exist or is not public.");
         }
 
         try {
