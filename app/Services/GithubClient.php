@@ -36,7 +36,8 @@ class GithubClient {
         Logger::info($this->logFile, "GET paginated $endpoint with query: " . json_encode($query));
         $results = [];
         $page = 1;
-
+        $maxPages = 30;
+        
         try {
             do {
                 $query['page'] = $page;
@@ -50,9 +51,9 @@ class GithubClient {
 
                 $linkHeader = $response->getHeaderLine('Link');
                 $hasNextPage = str_contains($linkHeader, 'rel="next"');
-
                 $page++;
-            } while ($hasNextPage);
+
+            } while ($hasNextPage && $page <= $maxPages);
 
             return $results;
 

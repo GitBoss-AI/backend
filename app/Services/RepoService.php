@@ -46,7 +46,7 @@ class RepoService extends BaseService {
                 'snapshot_date' => date('Y-m-d H:i:s'),
                 'commits' => $this->getRepoCommitCount($repoOwner, $repoName),
                 'open_prs' => $this->getRepoOpenPrCount($repoOwner, $repoName),
-                'merged_prs' => $this->getRepoMergedPrCount($repoOwner, $repoName),
+                //'merged_prs' => $this->getRepoMergedPrCount($repoOwner, $repoName),
                 'open_issues' => $this->getRepoOpenIssueCount($repoOwner, $repoName),
                 'reviews' => $this->getRepoReviewCount($repoOwner, $repoName)
             ];
@@ -192,32 +192,17 @@ class RepoService extends BaseService {
     }
 
     public function getRepoReviewCount(string $owner, string $repo) {
-        Logger::info($this->logFile, "Fetching review count for $owner/$repo (last 24h)");
-        $since = strtotime('-1 day');
+        $pulls = $this->githubClient->getPaginated("repos/$owner/$repo/pulls", [
+            'state' => 'open',
+        ]);
+
         $totalReviews = 0;
-        $maxPages = 3;  // Set max pages to get data of last 24 hours
+        foreach ($pulls as $pr) {
+            if (!isset($pr['number'])) continue;
 
-        for ($page = 1; $page <= $maxPages; $page++) {
-            $pulls = $this->githubClient->get("repos/$owner/$repo/pulls", [
-                'state' => 'open',
-                'sort' => 'updated',
-                'direction' => 'desc',
-                'per_page' => 100,
-                'page' => $page
-            ]);
-
-            if (empty($pulls)) break;
-
-            foreach ($pulls as $pr) {
-                if (!isset($pr['number']) || !isset($pr['updated_at'])) continue;
-                if (strtotime($pr['updated_at']) < $since) break 2;
-
-                $reviews = $this->githubClient->get("repos/$owner/$repo/pulls/{$pr['number']}/reviews");
-                $totalReviews += count($reviews);
-            }
+            $reviews = $this->githubClient->getPaginated("repos/$owner/$repo/pulls/{$pr['number']}/reviews");
+            $totalReviews += count($reviews);
         }
-
-        Logger::info($this->logFile, "Total reviews in last 24h for $owner/$repo: $totalReviews");
         return $totalReviews;
     }
 

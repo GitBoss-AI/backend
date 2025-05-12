@@ -285,34 +285,23 @@ class ContributorService extends BaseService {
     }
 
     public function getContributorReviewCount(string $username, string $owner, string $repo) {
-        $since = strtotime('-1 day');
         $totalReviews = 0;
-        $page = 1;
 
-        while (true) {
-            $pulls = $this->githubClient->get("repos/$owner/$repo/pulls", [
-                'state' => 'all',
-                'sort' => 'updated',
-                'direction' => 'desc',
-                'per_page' => 100,
-                'page' => $page
-            ]);
+        $pulls = $this->githubClient->getPaginated("repos/$owner/$repo/pulls", [
+            'state' => 'open'
+        ]);
 
-            if (empty($pulls)) break;
+        foreach ($pulls as $pr) {
+            $prNumber = $pr['number'] ?? null;
+            if (!$prNumber) continue;
 
-            foreach ($pulls as $pr) {
-                if (!isset($pr['number']) || !isset($pr['updated_at'])) continue;
-                if (strtotime($pr['updated_at']) < $since) break 2;
+            $reviews = $this->githubClient->getPaginated("repos/$owner/$repo/pulls/$prNumber/reviews");
 
-                $reviews = $this->githubClient->get("repos/$owner/$repo/pulls/{$pr['number']}/reviews");
-
-                foreach ($reviews as $review) {
-                    if (($review['user']['login'] ?? '') === $username) {
-                        $totalReviews++;
-                    }
+            foreach ($reviews as $review) {
+                if (($review['user']['login'] ?? '') === $username) {
+                    $totalReviews++;
                 }
             }
-            $page++;
         }
         return $totalReviews;
     }
