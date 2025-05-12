@@ -15,9 +15,9 @@ $php = trim(shell_exec('which php'));
 $projectRoot = realpath(__DIR__ . '/../../');
 
 // Define worker paths
-$repoWorker = "$php $projectRoot/app/Cronjob/Workers/RepoStatsWorker.php >> /var/log/gitboss/repoworker.log 2>&1";
-$contribWorker = "$php $projectRoot/app/Cronjob/Workers/ContributorStatsWorker.php >> /var/log/gitboss/contribworker.log 2>&1";
-$activityWorker = "$php $projectRoot/app/Cronjob/Workers/ContributorActivityWorker.php >> /var/log/gitboss/activityworker.log 2>&1";
+$repoWorker = "$php $projectRoot/app/Cronjob/Workers/RepoStatsWorker.php >> /var/www/gitboss-ai/backend-dev/log/repoworker.log 2>&1";
+$contribWorker = "$php $projectRoot/app/Cronjob/Workers/ContributorStatsWorker.php >> /var/www/gitboss-ai/backend-dev/log/contribworker.log 2>&1";
+$activityWorker = "$php $projectRoot/app/Cronjob/Workers/ContributorActivityWorker.php >> /var/www/gitboss-ai/backend-dev/log/activityworker.log 2>&1";
 
 // Register them
 $cron = new CronManager();
