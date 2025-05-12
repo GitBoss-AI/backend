@@ -3,11 +3,13 @@ namespace App\Services;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
+use App\Logger\Logger;
 
 class GithubClient {
     private $client;
     private $githubUrl;
     private $githubToken;
+    private $logFile = 'githubclient';
 
     public function __construct() {
         $this->githubUrl = $_ENV['GITHUB_API_URL'];
@@ -24,13 +26,21 @@ class GithubClient {
     }
 
     public function get(string $endpoint, array $query = []): array {
+        Logger::info($this->logFile, "GET $endpoint with query: " . json_encode($query));
         if (!isset($query['since']) && str_contains($endpoint, '/commits')) {
             $query['since'] = date('c', strtotime('-1 day'));
         }
-        return $this->request('GET', $endpoint, ['query' => $query]);
+
+        try {
+            return $this->request('GET', $endpoint, ['query' => $query]);
+        } catch (\Exception $e) {
+            Logger::error($this->logFile, "GET $endpoint failed: " . $e->getMessage());
+            return [];
+        }
     }
 
     public function getPaginated(string $endpoint, array $query = []): array {
+        Logger::info($this->logFile, "GET paginated $endpoint with query: " . json_encode($query));
         $results = [];
         $page = 1;
 
@@ -38,22 +48,34 @@ class GithubClient {
             $query['since'] = date('c', strtotime('-1 day'));
         }
 
-        do {
-            $query['page'] = $page;
-            $query['per_page'] = $query['per_page'] ?? 100;
+        try {
+            do {
+                $query['page'] = $page;
+                $query['per_page'] = $query['per_page'] ?? 100;
 
-            $response = $this->client->request('GET', $endpoint, ['query' => $query]);
-            $data = json_decode($response->getBody(), true);
-            $results = array_merge($results, $data);
+                $response = $this->client->request('GET', $endpoint, ['query' => $query]);
+                $data = json_decode($response->getBody(), true);
+                $results = array_merge($results, $data);
 
-            $linkHeader = $response->getHeaderLine('Link');
-            $hasNextPage = str_contains($linkHeader, 'rel="next"');
+                Logger::info($this->logFile, "Fetched page $page of $endpoint, count=" . count($data));
 
-            $page++;
-        } while ($hasNextPage);
+                $linkHeader = $response->getHeaderLine('Link');
+                $hasNextPage = str_contains($linkHeader, 'rel="next"');
+
+                $page++;
+            } while ($hasNextPage);
+        } catch (RequestException $e) {
+            $body = $e->hasResponse() ? (string) $e->getResponse()->getBody() : $e->getMessage();
+            Logger::error($this->logFile, "Paginated GET $endpoint failed: $body");
+            return [];
+        } catch (\Exception $e) {
+            Logger::error($this->logFile, "Unexpected error in paginated GET $endpoint: " . $e->getMessage());
+            return [];
+        }
 
         return $results;
     }
+
 
     private function request(string $method, string $endpoint, array $options = []) {
         try {
@@ -71,6 +93,8 @@ class GithubClient {
             } else {
                 $msg = "GitHub API exception: " . $e->getMessage();
             }
+
+            Logger::error($this->logFile, "Request to $endpoint failed: $msg");
             throw new \Exception($msg);
         }
     }

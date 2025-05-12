@@ -1,17 +1,25 @@
 <?php
 namespace App\Services;
 
+use App\Logger\Logger;
+
 class ContributorService extends BaseService {
+
+    private $logFile = 'contributorservice';
+
     public function add(int $repo_id, string $repo_url) {
         $parsedUrl = $this->parseGithubUrl($repo_url);
         $repoOwner = $parsedUrl['owner'];
         $repoName = $parsedUrl['name'];
 
+        Logger::info('contribworker', "Adding contributors for $repoOwner/$repoName (repo_id=$repo_id)");
+
         $contributors = $this->getContributors($repoOwner, $repoName);
+
         foreach ($contributors as $contributor) {
             $username = $contributor['login'];
+            Logger::info('contribworker', "Processing contributor: $username");
 
-            // Check if contributor exists
             $existingContributor = $this->db->selectOne(
                 "SELECT id FROM contributors WHERE github_username = :username",
                 ['username' => $username]
@@ -23,19 +31,22 @@ class ContributorService extends BaseService {
                     'created_at' => date('Y-m-d H:i:s')
                 ]);
                 $contributorId = $this->db->pdo()->lastInsertId();
+                Logger::info('contribworker', "Inserted new contributor: $username (id=$contributorId)");
             } else {
-                $contributorId = $contributor['id'];
+                $contributorId = $existingContributor['id'];
+                Logger::info('contribworker', "Contributor already exists: $username (id=$contributorId)");
             }
 
             // Link contributor to repo
             $this->db->insert('repo_has_contributor', [
                 'repo_id' => $repo_id,
                 'contributor_id' => $contributorId,
-                'first_seen' => date('Y-m-d'),
-                'last_seen' => date('Y-m-d')
+                'first_seen' => date('Y-m-d H:i:s'),
+                'last_seen' => date('Y-m-d H:i:s')
             ]);
 
-            // Fetch stats from github api and create stats snapshot
+            Logger::info('contribworker', "Linked $username to repo_id=$repo_id");
+
             $contributorStatsData = [
                 'contributor_id' => $contributorId,
                 'repo_id' => $repo_id,
@@ -45,6 +56,8 @@ class ContributorService extends BaseService {
                 'reviews' => $this->getContributorReviewCount($username, $repoOwner, $repoName)
             ];
             $this->db->insert('contributor_stats', $contributorStatsData);
+
+            Logger::info('contribworker', "Inserted snapshot for $username");
         }
     }
 
@@ -54,18 +67,20 @@ class ContributorService extends BaseService {
         ?int $repoId = null,
         ?int $userId = null
     ) {
+        Logger::info('contribworker', "Fetching stats for $githubUsername (repo_id=$repoId, user_id=$userId, window=$timeWindow)");
+
         $contributor = $this->db->selectOne(
             "SELECT id FROM contributors WHERE github_username = :username",
             ['username' => $githubUsername]
         );
 
         if (!$contributor) {
+            Logger::error('contribworker', "Contributor $githubUsername not found");
             throw new \Exception("Contributor not found");
         }
 
         $contributorId = $contributor['id'];
 
-        // If repo/user provided, verify user owns repo
         if ($repoId !== null && $userId !== null) {
             $ownership = $this->db->selectOne(
                 "SELECT r.id FROM repos r
@@ -75,6 +90,7 @@ class ContributorService extends BaseService {
             );
 
             if (!$ownership) {
+                Logger::error('contribworker', "User $userId does not own repo $repoId");
                 throw new \Exception("User does not own the requested repository.");
             }
         }
@@ -96,22 +112,22 @@ class ContributorService extends BaseService {
         );
 
         if (!$latest) {
-            // TODO: get stats from github api
+            Logger::error('contribworker', "No snapshot found for $githubUsername");
             throw new \Exception("No snapshot data available.");
         }
 
-        // If no timeWindow is given just return the latest stats
         if (!$timeWindow) {
+            Logger::info('contribworker', "Returning latest snapshot for $githubUsername");
             return [
                 'date' => $latest['snapshot_date'],
                 'stats' => $this->stripRepoFields($latest)
             ];
         }
 
-        // Compute the start date threshold
         try {
             $startDate = $this->getStartDate($timeWindow);
         } catch (\Exception $e) {
+            Logger::error('contribworker', "Invalid time window '$timeWindow' for $githubUsername");
             throw new \Exception("Invalid time_window: " . $e->getMessage());
         }
 
@@ -124,10 +140,11 @@ class ContributorService extends BaseService {
         );
 
         if (!$earlier) {
+            Logger::error('contribworker', "No earlier snapshot for $githubUsername before $startDate");
             throw new \Exception("No snapshot found at or before start of time window.");
         }
 
-        // Compute deltas
+        Logger::info('contribworker', "Computed delta stats for $githubUsername");
         return [
             'from' => $earlier['snapshot_date'],
             'to' => $latest['snapshot_date'],
@@ -140,16 +157,18 @@ class ContributorService extends BaseService {
     }
 
     public function topPerformers(int $repoId, ?string $timeWindow = null) {
+        Logger::info('contribworker', "Calculating top performers for repo_id=$repoId, window=$timeWindow");
+
         $startDate = null;
 
         if ($timeWindow) {
             try {
                 $startDate = $this->getStartDate($timeWindow);
             } catch (\Exception $e) {
+                Logger::error('contribworker', "Invalid time window '$timeWindow'");
                 throw new \Exception("Invalid time_window: " . $e->getMessage());
             }
         }
-
 
         $contributors = $this->db->selectAll("
             SELECT c.id, c.github_username
@@ -159,13 +178,14 @@ class ContributorService extends BaseService {
             ['repo_id' => $repoId]
         );
 
+        Logger::info('contribworker', "Found " . count($contributors) . " contributors");
+
         $allStats = [];
 
         foreach ($contributors as $contributor) {
             $cid = $contributor['id'];
             $username = $contributor['github_username'];
 
-            // latest snapshot
             $latest = $this->db->selectOne(
                 "SELECT * FROM contributor_stats
              WHERE contributor_id = :cid AND repo_id = :rid
@@ -176,44 +196,36 @@ class ContributorService extends BaseService {
 
             if (!$latest) continue;
 
-            // earlier snapshot
-            $earlier = $this->db->selectOne(
-                "SELECT * FROM contributor_stats
-             WHERE contributor_id = :cid AND repo_id = :rid AND snapshot_date <= :start
-             ORDER BY snapshot_date DESC
-             LIMIT 1",
-                ['cid' => $cid, 'rid' => $repoId, 'start' => $startDate]
-            );
-
-            if (!$earlier) continue;
-
-            $stats = [
-                'github_username' => $username,
-            ];
-
             if ($startDate) {
                 $earlier = $this->db->selectOne(
                     "SELECT * FROM contributor_stats
-                 WHERE contributor_id = :cid AND repo_id = :rid AND snapshot_date <= :start
-                 ORDER BY snapshot_date DESC
-                 LIMIT 1",
+                     WHERE contributor_id = :cid AND repo_id = :rid AND snapshot_date <= :start
+                     ORDER BY snapshot_date DESC
+                     LIMIT 1",
                     ['cid' => $cid, 'rid' => $repoId, 'start' => $startDate]
                 );
 
                 if (!$earlier) continue;
 
-                $stats['commits']    = $latest['commits']    - $earlier['commits'];
-                $stats['prs_opened'] = $latest['prs_opened'] - $earlier['prs_opened'];
-                $stats['reviews']    = $latest['reviews']    - $earlier['reviews'];
+                $stats = [
+                    'github_username' => $username,
+                    'commits' => $latest['commits'] - $earlier['commits'],
+                    'prs_opened' => $latest['prs_opened'] - $earlier['prs_opened'],
+                    'reviews' => $latest['reviews'] - $earlier['reviews'],
+                ];
             } else {
-                // All-time totals
-                $stats['commits']    = $latest['commits'];
-                $stats['prs_opened'] = $latest['prs_opened'];
-                $stats['reviews']    = $latest['reviews'];
+                $stats = [
+                    'github_username' => $username,
+                    'commits' => $latest['commits'],
+                    'prs_opened' => $latest['prs_opened'],
+                    'reviews' => $latest['reviews'],
+                ];
             }
 
             $allStats[] = $stats;
         }
+
+        Logger::info('contribworker', "Collected stats for " . count($allStats) . " contributors");
 
         $getTop = function($metric) use ($allStats) {
             $sorted = $allStats;
@@ -229,6 +241,8 @@ class ContributorService extends BaseService {
     }
 
     public function getRecentEvents(int $repoId) {
+        Logger::info('contribworker', "Fetching recent events for repo_id=$repoId");
+
         $events = $this->db->selectAll(
             "SELECT cae.*, c.github_username
              FROM contributor_activity_events cae
@@ -239,6 +253,8 @@ class ContributorService extends BaseService {
              LIMIT 10",
             ['repo_id' => $repoId]
         );
+
+        Logger::info('contribworker', "Fetched " . count($events) . " events");
 
         foreach ($events as $i => &$event) {
             $event['highlight'] = $i < 3;
