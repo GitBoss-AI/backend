@@ -12,13 +12,13 @@ class ContributorService extends BaseService {
         $repoOwner = $parsedUrl['owner'];
         $repoName = $parsedUrl['name'];
 
-        Logger::info('contribworker', "Adding contributors for $repoOwner/$repoName (repo_id=$repo_id)");
+        Logger::info($this->logFile, "Adding contributors for $repoOwner/$repoName (repo_id=$repo_id)");
 
         $contributors = $this->getContributors($repoOwner, $repoName);
 
         foreach ($contributors as $contributor) {
             $username = $contributor['login'];
-            Logger::info('contribworker', "Processing contributor: $username");
+            Logger::info($this->logFile, "Processing contributor: $username");
 
             $existingContributor = $this->db->selectOne(
                 "SELECT id FROM contributors WHERE github_username = :username",
@@ -31,10 +31,10 @@ class ContributorService extends BaseService {
                     'created_at' => date('Y-m-d H:i:s')
                 ]);
                 $contributorId = $this->db->pdo()->lastInsertId();
-                Logger::info('contribworker', "Inserted new contributor: $username (id=$contributorId)");
+                Logger::info($this->logFile, "Inserted new contributor: $username (id=$contributorId)");
             } else {
                 $contributorId = $existingContributor['id'];
-                Logger::info('contribworker', "Contributor already exists: $username (id=$contributorId)");
+                Logger::info($this->logFile, "Contributor already exists: $username (id=$contributorId)");
             }
 
             // Link contributor to repo
@@ -45,7 +45,7 @@ class ContributorService extends BaseService {
                 'last_seen' => date('Y-m-d H:i:s')
             ]);
 
-            Logger::info('contribworker', "Linked $username to repo_id=$repo_id");
+            Logger::info($this->logFile, "Linked $username to repo_id=$repo_id");
 
             $contributorStatsData = [
                 'contributor_id' => $contributorId,
@@ -57,7 +57,7 @@ class ContributorService extends BaseService {
             ];
             $this->db->insert('contributor_stats', $contributorStatsData);
 
-            Logger::info('contribworker', "Inserted snapshot for $username");
+            Logger::info($this->logFile, "Inserted snapshot for $username");
         }
     }
 
@@ -67,7 +67,7 @@ class ContributorService extends BaseService {
         ?int $repoId = null,
         ?int $userId = null
     ) {
-        Logger::info('contribworker', "Fetching stats for $githubUsername (repo_id=$repoId, user_id=$userId, window=$timeWindow)");
+        Logger::info($this->logFile, "Fetching stats for $githubUsername (repo_id=$repoId, user_id=$userId, window=$timeWindow)");
 
         $contributor = $this->db->selectOne(
             "SELECT id FROM contributors WHERE github_username = :username",
@@ -75,7 +75,7 @@ class ContributorService extends BaseService {
         );
 
         if (!$contributor) {
-            Logger::error('contribworker', "Contributor $githubUsername not found");
+            Logger::error($this->logFile, "Contributor $githubUsername not found");
             throw new \Exception("Contributor not found");
         }
 
@@ -90,7 +90,7 @@ class ContributorService extends BaseService {
             );
 
             if (!$ownership) {
-                Logger::error('contribworker', "User $userId does not own repo $repoId");
+                Logger::error($this->logFile, "User $userId does not own repo $repoId");
                 throw new \Exception("User does not own the requested repository.");
             }
         }
@@ -112,12 +112,12 @@ class ContributorService extends BaseService {
         );
 
         if (!$latest) {
-            Logger::error('contribworker', "No snapshot found for $githubUsername");
+            Logger::error($this->logFile, "No snapshot found for $githubUsername");
             throw new \Exception("No snapshot data available.");
         }
 
         if (!$timeWindow) {
-            Logger::info('contribworker', "Returning latest snapshot for $githubUsername");
+            Logger::info($this->logFile, "Returning latest snapshot for $githubUsername");
             return [
                 'date' => $latest['snapshot_date'],
                 'stats' => $this->stripRepoFields($latest)
@@ -127,7 +127,7 @@ class ContributorService extends BaseService {
         try {
             $startDate = $this->getStartDate($timeWindow);
         } catch (\Exception $e) {
-            Logger::error('contribworker', "Invalid time window '$timeWindow' for $githubUsername");
+            Logger::error($this->logFile, "Invalid time window '$timeWindow' for $githubUsername");
             throw new \Exception("Invalid time_window: " . $e->getMessage());
         }
 
@@ -140,11 +140,11 @@ class ContributorService extends BaseService {
         );
 
         if (!$earlier) {
-            Logger::error('contribworker', "No earlier snapshot for $githubUsername before $startDate");
+            Logger::error($this->logFile, "No earlier snapshot for $githubUsername before $startDate");
             throw new \Exception("No snapshot found at or before start of time window.");
         }
 
-        Logger::info('contribworker', "Computed delta stats for $githubUsername");
+        Logger::info($this->logFile, "Computed delta stats for $githubUsername");
         return [
             'from' => $earlier['snapshot_date'],
             'to' => $latest['snapshot_date'],
@@ -157,7 +157,7 @@ class ContributorService extends BaseService {
     }
 
     public function topPerformers(int $repoId, ?string $timeWindow = null) {
-        Logger::info('contribworker', "Calculating top performers for repo_id=$repoId, window=$timeWindow");
+        Logger::info($this->logFile, "Calculating top performers for repo_id=$repoId, window=$timeWindow");
 
         $startDate = null;
 
@@ -165,7 +165,7 @@ class ContributorService extends BaseService {
             try {
                 $startDate = $this->getStartDate($timeWindow);
             } catch (\Exception $e) {
-                Logger::error('contribworker', "Invalid time window '$timeWindow'");
+                Logger::error($this->logFile, "Invalid time window '$timeWindow'");
                 throw new \Exception("Invalid time_window: " . $e->getMessage());
             }
         }
@@ -178,7 +178,7 @@ class ContributorService extends BaseService {
             ['repo_id' => $repoId]
         );
 
-        Logger::info('contribworker', "Found " . count($contributors) . " contributors");
+        Logger::info($this->logFile, "Found " . count($contributors) . " contributors");
 
         $allStats = [];
 
@@ -225,7 +225,7 @@ class ContributorService extends BaseService {
             $allStats[] = $stats;
         }
 
-        Logger::info('contribworker', "Collected stats for " . count($allStats) . " contributors");
+        Logger::info($this->logFile, "Collected stats for " . count($allStats) . " contributors");
 
         $getTop = function($metric) use ($allStats) {
             $sorted = $allStats;
@@ -241,7 +241,7 @@ class ContributorService extends BaseService {
     }
 
     public function getRecentEvents(int $repoId) {
-        Logger::info('contribworker', "Fetching recent events for repo_id=$repoId");
+        Logger::info($this->logFile, "Fetching recent events for repo_id=$repoId");
 
         $events = $this->db->selectAll(
             "SELECT cae.*, c.github_username
@@ -254,7 +254,7 @@ class ContributorService extends BaseService {
             ['repo_id' => $repoId]
         );
 
-        Logger::info('contribworker', "Fetched " . count($events) . " events");
+        Logger::info($this->logFile, "Fetched " . count($events) . " events");
 
         foreach ($events as $i => &$event) {
             $event['highlight'] = $i < 3;
