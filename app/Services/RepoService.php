@@ -19,7 +19,7 @@ class RepoService extends BaseService {
             $this->assertUserOwnsGithubOwner($user_id, $repoOwner);
         } catch (\Exception $e) {
             Logger::error($this->logFile, "Validation failed: " . $e->getMessage());
-            throw $e; // or return null / false / custom error response
+            throw $e;
         }
 
         if (!$this->isPublicRepo($repoOwner, $repoName)) {

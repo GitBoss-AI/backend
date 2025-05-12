@@ -31,12 +31,7 @@ class GithubClient {
             $query['since'] = date('c', strtotime('-1 day'));
         }
 
-        try {
-            return $this->request('GET', $endpoint, ['query' => $query]);
-        } catch (\Exception $e) {
-            Logger::error($this->logFile, "GET $endpoint failed: " . $e->getMessage());
-            return [];
-        }
+        return $this->request('GET', $endpoint, ['query' => $query]);
     }
 
     public function getPaginated(string $endpoint, array $query = []): array {
@@ -48,30 +43,21 @@ class GithubClient {
             $query['since'] = date('c', strtotime('-1 day'));
         }
 
-        try {
-            do {
-                $query['page'] = $page;
-                $query['per_page'] = $query['per_page'] ?? 100;
+        do {
+            $query['page'] = $page;
+            $query['per_page'] = $query['per_page'] ?? 100;
 
-                $response = $this->client->request('GET', $endpoint, ['query' => $query]);
-                $data = json_decode($response->getBody(), true);
-                $results = array_merge($results, $data);
+            $response = $this->request('GET', $endpoint, ['query' => $query]);
+            $data = json_decode($response->getBody(), true);
+            $results = array_merge($results, $data);
 
-                Logger::info($this->logFile, "Fetched page $page of $endpoint, count=" . count($data));
+            Logger::info($this->logFile, "Fetched page $page of $endpoint, count=" . count($data));
 
-                $linkHeader = $response->getHeaderLine('Link');
-                $hasNextPage = str_contains($linkHeader, 'rel="next"');
+            $linkHeader = $response->getHeaderLine('Link');
+            $hasNextPage = str_contains($linkHeader, 'rel="next"');
 
-                $page++;
-            } while ($hasNextPage);
-        } catch (RequestException $e) {
-            $body = $e->hasResponse() ? (string) $e->getResponse()->getBody() : $e->getMessage();
-            Logger::error($this->logFile, "Paginated GET $endpoint failed: $body");
-            return [];
-        } catch (\Exception $e) {
-            Logger::error($this->logFile, "Unexpected error in paginated GET $endpoint: " . $e->getMessage());
-            return [];
-        }
+            $page++;
+        } while ($hasNextPage);
 
         return $results;
     }
