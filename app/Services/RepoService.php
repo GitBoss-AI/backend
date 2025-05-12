@@ -191,20 +191,30 @@ class RepoService extends BaseService {
         return $count;
     }
 
-    public function getRepoReviewCount(string $owner, string $repo) {
+    public function getRepoReviewCount(string $owner, string $repo, string $since) {
         $pulls = $this->githubClient->getPaginated("repos/$owner/$repo/pulls", [
-            'state' => 'open',
+            'state' => 'open'
         ]);
 
         $totalReviews = 0;
+        $sinceTimestamp = strtotime($since);
+
         foreach ($pulls as $pr) {
             if (!isset($pr['number'])) continue;
 
             $reviews = $this->githubClient->getPaginated("repos/$owner/$repo/pulls/{$pr['number']}/reviews");
-            $totalReviews += count($reviews);
+
+            foreach ($reviews as $review) {
+                if (!isset($review['submitted_at'])) continue;
+                if (strtotime($review['submitted_at']) >= $sinceTimestamp) {
+                    $totalReviews++;
+                }
+            }
         }
+
         return $totalReviews;
     }
+
 
     private function assertRepoNotAlreadyTracked(string $repo_url, int $user_id): void {
         $repo = $this->db->selectOne(

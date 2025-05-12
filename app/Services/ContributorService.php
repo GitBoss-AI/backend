@@ -267,8 +267,7 @@ class ContributorService extends BaseService {
         return $this->githubClient->getPaginated("repos/$owner/$repo/contributors");
     }
 
-    public function getContributorCommitCount(string $username, string $owner, string $repo) {
-        $since = date('c', strtotime('-1 day'));
+    public function getContributorCommitCount(string $username, string $owner, string $repo, string $since) {
         $commits = $this->githubClient->getPaginated("repos/$owner/$repo/commits", [
             'author' => $username,
             'since' => $since
@@ -284,8 +283,9 @@ class ContributorService extends BaseService {
         return $result['total_count'];
     }
 
-    public function getContributorReviewCount(string $username, string $owner, string $repo) {
+    public function getContributorReviewCount(string $username, string $owner, string $repo, string $since) {
         $totalReviews = 0;
+        $sinceTimestamp = strtotime($since);
 
         $pulls = $this->githubClient->getPaginated("repos/$owner/$repo/pulls", [
             'state' => 'open'
@@ -298,11 +298,16 @@ class ContributorService extends BaseService {
             $reviews = $this->githubClient->getPaginated("repos/$owner/$repo/pulls/$prNumber/reviews");
 
             foreach ($reviews as $review) {
-                if (($review['user']['login'] ?? '') === $username) {
+                if (
+                    isset($review['user']['login'], $review['submitted_at']) &&
+                    $review['user']['login'] === $username &&
+                    strtotime($review['submitted_at']) >= $sinceTimestamp
+                ) {
                     $totalReviews++;
                 }
             }
         }
+
         return $totalReviews;
     }
 }
