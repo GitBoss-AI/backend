@@ -45,6 +45,10 @@ class RepoService extends BaseService {
             throw new \Exception("You do not have permission to add repos for owner '$repoOwner'.");
         }
 
+        if (!$this->isPublicRepo($repoOwner, $repoName)) {
+            throw new \Exception("The repository $repoOwner/$repoName does not exist or is not public.");
+        }
+
         $this->db->insert('repos', [
             'url' => $repo_url,
             'owner' => $repoOwner,
@@ -212,5 +216,15 @@ class RepoService extends BaseService {
 
         Logger::info($this->logFile, "Total reviews in last 24h for $owner/$repo: $totalReviews");
         return $totalReviews;
+    }
+
+    private function isPublicRepo(string $owner, string $repo): bool {
+        try {
+            $this->githubClient->get("repos/$owner/$repo");
+            return true;
+        } catch (\Exception $e) {
+            Logger::error($this->logFile, "Repo $owner/$repo is not accessible: " . $e->getMessage());
+            return false;
+        }
     }
 }
