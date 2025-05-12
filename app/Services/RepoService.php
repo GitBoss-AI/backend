@@ -8,74 +8,62 @@ class RepoService extends BaseService {
     private $logFile = 'reposervice';
 
     public function add(int $user_id, string $repo_url) {
-        Logger::info($this->logFile, "Attempting to add repo: $repo_url for user_id=$user_id");
-
-        $repo = $this->db->selectOne(
-            "SELECT * FROM repos WHERE url = :url",
-            ['url' => $repo_url]
-        );
-
-        if ($repo) {
-            Logger::info($this->logFile, "Repo $repo_url already exists.");
-            $ownership = $this->db->selectOne(
-                "SELECT * FROM github_ownerships WHERE owner = :owner AND user_id = :user_id",
-                ['owner' => $repo['owner'], 'user_id' => $user_id]
-            );
-
-            if ($ownership) {
-                Logger::error($this->logFile, "User already owns this repo.");
-                throw new \Exception("This repository has already been added to the system.");
-            } else {
-                Logger::error($this->logFile, "Repo is owned by another user.");
-                throw new \Exception("This repository is already tracked by another user.");
-            }
-        }
-
         $parsedUrl = $this->parseGithubUrl($repo_url);
         $repoOwner = $parsedUrl['owner'];
         $repoName = $parsedUrl['name'];
 
-        $ownership = $this->db->selectOne(
-            "SELECT * FROM github_ownerships WHERE owner = :owner AND user_id = :user_id",
-            ['owner' => $repoOwner, 'user_id' => $user_id]
-        );
+        Logger::info($this->logFile, "Attempting to add repo: $repo_url for user_id=$user_id");
 
-        if (!$ownership) {
-            Logger::error($this->logFile, "User $user_id is not authorized for owner $repoOwner.");
-            throw new \Exception("You do not have permission to add repos for owner '$repoOwner'.");
+        // Check for duplicate repos
+        $this->assertRepoNotAlreadyTracked($repo_url, $user_id);
+        // Check that user is authorized to add repos for this owner
+        $this->assertUserOwnsGithubOwner($user_id, $repoOwner);
+
+        try {
+            $this->assertRepoNotAlreadyTracked($repo_url, $user_id);
+            $this->assertUserOwnsGithubOwner($user_id, $repoOwner);
+        } catch (\Exception $e) {
+            Logger::error($this->logFile, "Validation failed: " . $e->getMessage());
+            throw $e; // or return null / false / custom error response
         }
 
-        if (!$this->isPublicRepo($repoOwner, $repoName)) {
-            throw new \Exception("The repository $repoOwner/$repoName does not exist or is not public.");
+        try {
+            $this->db->pdo()->beginTransaction();
+
+            $this->db->insert('repos', [
+                'url' => $repo_url,
+                'owner' => $repoOwner,
+                'name' => $repoName,
+                'created_at' => date('Y-m-d H:i:s')
+            ]);
+
+            $result = $this->db->selectOne("SELECT id FROM repos ORDER BY id DESC LIMIT 1");
+            $newRepoId = $result['id'];
+
+            Logger::info($this->logFile, "Inserted repo [$repoName] with ID $newRepoId.");
+
+            $repoStatsData = [
+                'repo_id' => $newRepoId,
+                'snapshot_date' => date('Y-m-d H:i:s'),
+                'commits' => $this->getRepoCommitCount($repoOwner, $repoName),
+                'open_prs' => $this->getRepoOpenPrCount($repoOwner, $repoName),
+                'merged_prs' => $this->getRepoMergedPrCount($repoOwner, $repoName),
+                'open_issues' => $this->getRepoOpenIssueCount($repoOwner, $repoName),
+                'reviews' => $this->getRepoReviewCount($repoOwner, $repoName)
+            ];
+
+            $this->db->insert('repo_stats', $repoStatsData);
+            Logger::info($this->logFile, "Created stats snapshot for repo $newRepoId");
+
+            $this->db->pdo()->commit();
+
+            return $newRepoId;
+
+        } catch (\Exception $e) {
+            $this->db->pdo()->rollBack();
+            Logger::error($this->logFile, "Failed to add repo: " . $e->getMessage());
+            throw $e;
         }
-
-        $this->db->insert('repos', [
-            'url' => $repo_url,
-            'owner' => $repoOwner,
-            'name' => $repoName,
-            'created_at' => date('Y-m-d H:i:s')
-        ]);
-
-        $result = $this->db->selectOne("SELECT id FROM repos ORDER BY id DESC LIMIT 1");
-        $newRepoId = $result['id'];
-
-        Logger::info($this->logFile, "Inserted repo [$repoName] with ID $newRepoId.");
-
-        $repoStatsData = [
-            'repo_id' => $newRepoId,
-            'snapshot_date' => date('Y-m-d H:i:s'),
-            'commits' => $this->getRepoCommitCount($repoOwner, $repoName),
-            'open_prs' => $this->getRepoOpenPrCount($repoOwner, $repoName),
-            'merged_prs' => $this->getRepoMergedPrCount($repoOwner, $repoName),
-            'open_issues' => $this->getRepoOpenIssueCount($repoOwner, $repoName),
-            'reviews' => $this->getRepoReviewCount($repoOwner, $repoName)
-        ];
-
-        $this->db->insert('repo_stats', $repoStatsData);
-
-        Logger::info($this->logFile, "Created stats snapshot for repo $newRepoId");
-
-        return $newRepoId;
     }
 
 
@@ -216,6 +204,42 @@ class RepoService extends BaseService {
 
         Logger::info($this->logFile, "Total reviews in last 24h for $owner/$repo: $totalReviews");
         return $totalReviews;
+    }
+
+    private function assertRepoNotAlreadyTracked(string $repo_url, int $user_id): void {
+        $repo = $this->db->selectOne(
+            "SELECT * FROM repos WHERE url = :url",
+            ['url' => $repo_url]
+        );
+
+        if ($repo) {
+            Logger::info($this->logFile, "Repo $repo_url already exists.");
+
+            $ownership = $this->db->selectOne(
+                "SELECT * FROM github_ownerships WHERE owner = :owner AND user_id = :user_id",
+                ['owner' => $repo['owner'], 'user_id' => $user_id]
+            );
+
+            if ($ownership) {
+                Logger::error($this->logFile, "User already owns this repo.");
+                throw new \Exception("This repository has already been added to the system.");
+            } else {
+                Logger::error($this->logFile, "Repo is owned by another user.");
+                throw new \Exception("This repository is already tracked by another user.");
+            }
+        }
+    }
+
+    private function assertUserOwnsGithubOwner(int $user_id, string $owner): void {
+        $ownership = $this->db->selectOne(
+            "SELECT * FROM github_ownerships WHERE owner = :owner AND user_id = :user_id",
+            ['owner' => $owner, 'user_id' => $user_id]
+        );
+
+        if (!$ownership) {
+            Logger::error($this->logFile, "User $user_id is not authorized for owner $owner.");
+            throw new \Exception("You do not have permission to add repos for owner '$owner'.");
+        }
     }
 
     private function isPublicRepo(string $owner, string $repo): bool {
