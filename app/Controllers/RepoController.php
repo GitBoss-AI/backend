@@ -68,7 +68,7 @@ class RepoController {
         $timeWindow = $_GET['time_window'] ?? null;
         if (!$repoId) {
             http_response_code(400);
-            echo json_encode(['error' => 'Missing repo_url']);
+            echo json_encode(['error' => 'Missing repo_id']);
             return;
         }
 
