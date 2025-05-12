@@ -27,9 +27,7 @@ class GithubClient {
 
     public function get(string $endpoint, array $query = []): array {
         Logger::info($this->logFile, "GET $endpoint with query: " . json_encode($query));
-        if (!isset($query['since']) && str_contains($endpoint, '/commits')) {
-            $query['since'] = date('c', strtotime('-1 day'));
-        }
+        $query['since'] = date('c', strtotime('-1 day'));
 
         return $this->request('GET', $endpoint, ['query' => $query]);
     }
@@ -38,10 +36,6 @@ class GithubClient {
         Logger::info($this->logFile, "GET paginated $endpoint with query: " . json_encode($query));
         $results = [];
         $page = 1;
-
-        if (!isset($query['since']) && str_contains($endpoint, '/commits')) {
-            $query['since'] = date('c', strtotime('-1 day'));
-        }
 
         try {
             do {

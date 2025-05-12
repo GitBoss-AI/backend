@@ -31,9 +31,6 @@ $routes = [
 
         // Team
         '/api-dev/team/timeline' => [TeamController::class, 'getTimeline'],
-
-        // Activity feed
-        //'/api-dev/recent-activity' => [RecentActivityController::class, 'getRecentActivity'],
     ],
 ];
 
