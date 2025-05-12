@@ -43,23 +43,40 @@ class GithubClient {
             $query['since'] = date('c', strtotime('-1 day'));
         }
 
-        do {
-            $query['page'] = $page;
-            $query['per_page'] = $query['per_page'] ?? 100;
+        try {
+            do {
+                $query['page'] = $page;
+                $query['per_page'] = $query['per_page'] ?? 100;
 
-            $response = $this->request('GET', $endpoint, ['query' => $query]);
-            $data = json_decode($response->getBody(), true);
-            $results = array_merge($results, $data);
+                $response = $this->client->request('GET', $endpoint, ['query' => $query]);
+                $data = json_decode($response->getBody(), true);
+                $results = array_merge($results, $data);
 
-            Logger::info($this->logFile, "Fetched page $page of $endpoint, count=" . count($data));
+                Logger::info($this->logFile, "Fetched page $page of $endpoint, count=" . count($data));
 
-            $linkHeader = $response->getHeaderLine('Link');
-            $hasNextPage = str_contains($linkHeader, 'rel="next"');
+                $linkHeader = $response->getHeaderLine('Link');
+                $hasNextPage = str_contains($linkHeader, 'rel="next"');
 
-            $page++;
-        } while ($hasNextPage);
+                $page++;
+            } while ($hasNextPage);
 
-        return $results;
+            return $results;
+
+        } catch (RequestException $e) {
+            $response = $e->getResponse();
+            $msg = 'GitHub API request failed.';
+            if ($response) {
+                $body = (string) $response->getBody();
+                if (!empty($body)) {
+                    $msg = "GitHub API error: $body";
+                }
+            } else {
+                $msg = "GitHub API exception: " . $e->getMessage();
+            }
+
+            Logger::error($this->logFile, "Paginated GET $endpoint failed: $msg");
+            throw new \Exception($msg);
+        }
     }
 
 
